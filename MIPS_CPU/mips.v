@@ -16,7 +16,7 @@ module mips(input         clk, reset,
             output [31:0] memwritedata,
             input  [31:0] memreaddata);
 
-  wire        signext, shiftl16, memtoreg, branch;
+  wire        isjal, signext, shiftl16, memtoreg, branch;
   wire        pcsrc, zero;
   wire        alusrc, regdst, regwrite, jump;
   wire [2:0]  alucontrol;
@@ -26,6 +26,7 @@ module mips(input         clk, reset,
     .op         (instr[31:26]), 
 		.funct      (instr[5:0]), 
 		.zero       (zero),
+    .isjal      (isjal),
 		.signext    (signext),
 		.shiftl16   (shiftl16),
 		.memtoreg   (memtoreg),
@@ -41,6 +42,7 @@ module mips(input         clk, reset,
   datapath dp(
     .clk        (clk),
     .reset      (reset),
+    .isjal      (isjal),
     .signext    (signext),
     .shiftl16   (shiftl16),
     .memtoreg   (memtoreg),
@@ -61,6 +63,7 @@ endmodule
 
 module controller(input  [5:0] op, funct,
                   input        zero,
+                  output       isjal,
                   output       signext,
                   output       shiftl16,
                   output       memtoreg, memwrite,
@@ -75,6 +78,7 @@ module controller(input  [5:0] op, funct,
 
   maindec md(
     .op          (op),
+    .isjal       (isjal),
     .reversezero (reversezero),
     .signext     (signext),
     .shiftl16    (shiftl16),
@@ -98,6 +102,7 @@ endmodule
 
 
 module maindec(input  [5:0] op,
+               output       isjal,
                output       reversezero,
                output       signext,
                output       shiftl16,
@@ -107,24 +112,25 @@ module maindec(input  [5:0] op,
                output       jump,
                output [1:0] aluop);
 
-  reg [11:0] controls;
+  reg [12:0] controls;
 
-  assign {reversezero, signext, shiftl16, regwrite, regdst, alusrc, branch, memwrite,
+  assign {isjal, reversezero, signext, shiftl16, regwrite, regdst, alusrc, branch, memwrite,
           memtoreg, jump, aluop} = controls;
 
   always @(*)
     case(op)
-      6'b000000: controls <= #`mydelay 12'b000110000011; // Rtype
-      6'b100011: controls <= #`mydelay 12'b010101001000; // LW
-      6'b101011: controls <= #`mydelay 12'b010001010000; // SW
-      6'b000100: controls <= #`mydelay 12'b010000100001; // BEQ (signext, branch, aluop)
-      6'b000101: controls <= #`mydelay 12'b110000100001; // BNE (signext, aluop)
+      6'b000000: controls <= #`mydelay 13'b0000110000011; // Rtype
+      6'b100011: controls <= #`mydelay 13'b0010101001000; // LW
+      6'b101011: controls <= #`mydelay 13'b0010001010000; // SW
+      6'b000100: controls <= #`mydelay 13'b0010000100001; // BEQ (signext, branch, aluop)
+      6'b000101: controls <= #`mydelay 13'b0110000100001; // BNE (signext, aluop)
       6'b001000, 
-      6'b001001: controls <= #`mydelay 12'b010101000000; // ADDI, ADDIU: only difference is exception
-      6'b001101: controls <= #`mydelay 12'b000101000010; // ORI
-      6'b001111: controls <= #`mydelay 12'b001101000000; // LUI
-      6'b000010: controls <= #`mydelay 12'b000000000100; // J
-      default:   controls <= #`mydelay 12'bxxxxxxxxxxxx; // ???
+      6'b001001: controls <= #`mydelay 13'b0010101000000; // ADDI, ADDIU: only difference is exception
+      6'b001101: controls <= #`mydelay 13'b0000101000010; // ORI
+      6'b001111: controls <= #`mydelay 13'b0001101000000; // LUI
+      6'b000010: controls <= #`mydelay 13'b0000000000100; // J
+      6'b000011: controls <= #`mydelay 13'b1000100000100; // JAL
+      default:   controls <= #`mydelay 13'bxxxxxxxxxxxxx; // ???
     endcase
 
 endmodule
@@ -153,6 +159,7 @@ module aludec(input      [5:0] funct,
 endmodule
 
 module datapath(input         clk, reset,
+                input         isjal,
                 input         signext,
                 input         shiftl16,
                 input         memtoreg, pcsrc,
@@ -170,6 +177,8 @@ module datapath(input         clk, reset,
   wire [31:0] signimm, signimmsh, shiftedimm;
   wire [31:0] srca, srcb;
   wire [31:0] result;
+  wire [31:0] resmux_result;
+  wire [31:0] wrmux_result;
   wire        shift;
 
   // next PC logic
@@ -220,13 +229,27 @@ module datapath(input         clk, reset,
     .d0  (instr[20:16]),
     .d1  (instr[15:11]),
     .s   (regdst),
-    .y   (writereg));
+    .y   (wrmux_result));
+
+  mux2 #(5) jal_address(
+    .d0 (wrmux_result),
+    .d1 (5'b11111),
+    .s  (isjal),
+    .y  (writereg)
+  );
 
   mux2 #(32) resmux(
     .d0 (aluout),
     .d1 (readdata),
     .s  (memtoreg),
-    .y  (result));
+    .y  (resmux_result));
+
+  mux2 #(32) jal_value_mux(
+    .d0 (resmux_result),
+    .d1 (pcplus4),
+    .s  (isjal),
+    .y  (result)
+  );
 
   sign_zero_ext sze(
     .a       (instr[15:0]),
