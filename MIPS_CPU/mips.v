@@ -16,7 +16,7 @@ module mips(input         clk, reset,
             output [31:0] memwritedata,
             input  [31:0] memreaddata);
 
-  wire        isjal, signext, shiftl16, memtoreg, branch;
+  wire        isjal, isjr, signext, shiftl16, memtoreg, branch;
   wire        pcsrc, zero;
   wire        alusrc, regdst, regwrite, jump;
   wire [2:0]  alucontrol;
@@ -27,6 +27,7 @@ module mips(input         clk, reset,
 		.funct      (instr[5:0]), 
 		.zero       (zero),
     .isjal      (isjal),
+    .isjr       (isjr),
 		.signext    (signext),
 		.shiftl16   (shiftl16),
 		.memtoreg   (memtoreg),
@@ -43,6 +44,7 @@ module mips(input         clk, reset,
     .clk        (clk),
     .reset      (reset),
     .isjal      (isjal),
+    .isjr       (isjr),
     .signext    (signext),
     .shiftl16   (shiftl16),
     .memtoreg   (memtoreg),
@@ -64,6 +66,7 @@ endmodule
 module controller(input  [5:0] op, funct,
                   input        zero,
                   output       isjal,
+                  output       isjr,
                   output       signext,
                   output       shiftl16,
                   output       memtoreg, memwrite,
@@ -97,6 +100,7 @@ module controller(input  [5:0] op, funct,
     .alucontrol (alucontrol));
 
   assign pcsrc = branch & (zero ^ reversezero);
+  assign isjr = (funct[5:0] == 6'b001000) && (op[5:0] == 6'b000000);
 
 endmodule
 
@@ -160,6 +164,7 @@ endmodule
 
 module datapath(input         clk, reset,
                 input         isjal,
+                input         isjr,
                 input         signext,
                 input         shiftl16,
                 input         memtoreg, pcsrc,
@@ -178,14 +183,14 @@ module datapath(input         clk, reset,
   wire [31:0] srca, srcb;
   wire [31:0] result;
   wire [31:0] resmux_result;
-  wire [31:0] wrmux_result;
+  wire [31:0] wrmux_result, jrmux_result;
   wire        shift;
 
   // next PC logic
   flopr #(32) pcreg(
     .clk   (clk),
     .reset (reset),
-    .d     (pcnext),
+    .d     (jrmux_result),
     .q     (pc));
 
   adder pcadd1(
@@ -224,6 +229,13 @@ module datapath(input         clk, reset,
     .wd      (result),
     .rd1     (srca),
     .rd2     (writedata));
+
+  mux2 #(32) jrmux(
+    .d0 (pcnext),
+    .d1 (srca),
+    .s  (isjr),
+    .y  (jrmux_result)
+  );
 
   mux2 #(5) wrmux(
     .d0  (instr[20:16]),
