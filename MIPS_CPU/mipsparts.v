@@ -223,7 +223,7 @@ module alu(input      [31:0] a, b,
       3'b001: result <= #`mydelay a | b;
       3'b010: result <= #`mydelay sum;
       3'b011: result <= #`mydelay slt;
-	  3'b100: result <= #`mydelay sltu;
+	  3'b100: result <= #`mydelay {31'b0,sltu[0]};
 	  default: result <= #`mydelay 32'bx;
     endcase
 
