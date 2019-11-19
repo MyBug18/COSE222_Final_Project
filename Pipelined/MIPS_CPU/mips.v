@@ -16,61 +16,32 @@ module mips(input         clk, reset,
             output [31:0] memwritedata,
             input  [31:0] memreaddata);
 
-  wire        signext, shiftl16, memtoreg, branch;
   wire        pcsrc, zero;
-  wire        alusrc, regdst, regwrite, jump;
-  wire [2:0]  alucontrol;
-
-  // Instantiate Controller
-  controller c(
-    .op         (instr[31:26]), 
-		.funct      (instr[5:0]), 
-		.zero       (zero),
-		.signext    (signext),
-		.shiftl16   (shiftl16),
-		.memtoreg   (memtoreg),
-		.memwrite   (memwrite),
-		.pcsrc      (pcsrc),
-		.alusrc     (alusrc),
-		.regdst     (regdst),
-		.regwrite   (regwrite),
-		.jump       (jump),
-		.alucontrol (alucontrol));
 
   // Instantiate Datapath
   datapath dp(
     .clk        (clk),
     .reset      (reset),
-    .signext    (signext),
-    .shiftl16   (shiftl16),
-    .memtoreg   (memtoreg),
-    .pcsrc      (pcsrc),
-    .alusrc     (alusrc),
-    .regdst     (regdst),
-    .regwrite   (regwrite),
-    .jump       (jump),
-    .alucontrol (alucontrol),
-    .zero       (zero),
-    .pc         (pc),
+    .final_zero       (zero),
+    .final_pc         (pc),
     .instr      (instr),
-    .aluout     (memaddr), 
-    .writedata  (memwritedata),
+	 .final_memwrite   (memwrite),
+    .final_aluout     (memaddr), 
+    .final_writedata  (memwritedata),
     .readdata   (memreaddata));
 
 endmodule
 
 module controller(input  [5:0] op, funct,
-                  input        zero,
                   output       signext,
                   output       shiftl16,
                   output       memtoreg, memwrite,
-                  output       pcsrc, alusrc,
+                  output       branch, alusrc,
                   output       regdst, regwrite,
                   output       jump,
                   output [2:0] alucontrol);
 
   wire [1:0] aluop;
-  wire       branch;
 
   maindec md(
     .op       (op),
@@ -89,8 +60,6 @@ module controller(input  [5:0] op, funct,
     .funct      (funct),
     .aluop      (aluop), 
     .alucontrol (alucontrol));
-
-  assign pcsrc = branch & zero;
 
 endmodule
 
@@ -148,84 +117,117 @@ module aludec(input      [5:0] funct,
     
 endmodule
 
+module IF_ID(input clk,
+				 input [31:0] instr,
+				 input [31:0] pc_added_four,
+				 output reg [31:0] instr_out,
+				 output reg [31:0] pc_out);
+
+  always @(posedge clk)
+    begin
+	   instr_out <= #`mydelay instr;
+	   pc_out <= pc_added_four;
+	 end
+endmodule
+
+module ID_EX(input clk, 
+				 input memtoreg, memwrite, branch, alusrc, regdst, regwrite, jump,
+				 input [2:0] alucontrol,
+				 input [31:0] pc, 
+				 input [31:0] rd1, rd2,
+				 input [31:0] imm_val, shifted16_val,
+				 input [5:0] inst20_16, inst15_11,
+				 output reg memtoreg_out, memwrite_out, branch_out, alusrc_out, regdst_out, regwrite_out, jump_out, 
+				 output reg [2:0] alucontrol_out, 
+				 output reg [31:0] pc_out, 
+				 output reg [31:0] rd1_out, rd2_out, 
+				 output reg [31:0] imm_val_out, shifted16_val_out, 
+				 output reg [5:0] inst20_16_out, inst15_11_out);
+				 
+  always @(posedge clk)
+    begin
+		memtoreg_out <= #`mydelay memtoreg;
+		memwrite_out <= #`mydelay memwrite;
+		branch_out <= #`mydelay branch;
+		alusrc_out <= #`mydelay alusrc;
+		regdst_out <= #`mydelay regdst;
+		regwrite_out <= #`mydelay regwrite;
+		jump_out <= #`mydelay jump;
+		alucontrol_out <= #`mydelay alucontrol;
+		pc_out <= #`mydelay pc;
+		rd1_out <= #`mydelay rd1;
+		rd2_out <= #`mydelay rd2;
+		imm_val_out <= #`mydelay imm_val;
+		shifted16_val_out <= #`mydelay shifted16_val;
+		inst20_16_out <= #`mydelay inst20_16;
+		inst15_11_out <= #`mydelay inst15_11;
+	 end
+endmodule
+				 
 module datapath(input         clk, reset,
-                input         signext,
-                input         shiftl16,
-                input         memtoreg, pcsrc,
-                input         alusrc, regdst,
-                input         regwrite, jump,
-                input  [2:0]  alucontrol,
-                output        zero,
-                output [31:0] pc,
+                output        final_zero,
+					 output        final_memwrite,
+                output [31:0] final_pc,
                 input  [31:0] instr,
-                output [31:0] aluout, writedata,
+                output [31:0] final_aluout, final_writedata,
                 input  [31:0] readdata);
 
   wire [4:0]  writereg;
   wire [31:0] pcnext, pcnextbr, pcplus4, pcbranch;
   wire [31:0] signimm, signimmsh, shiftedimm;
-  wire [31:0] srca, srcb;
+  wire [31:0] rd1, srcb;
   wire [31:0] result;
+  wire [31:0] rd2;
   wire        shift;
-
-  // next PC logic
-  flopr #(32) pcreg(
-    .clk   (clk),
-    .reset (reset),
-    .d     (pcnext),
-    .q     (pc));
+  
+  wire [31:0] instr_after_IF_ID, pc_after_IF_ID, pc_after_ID_EX;
+  wire [31:0] rd1_after_ID_EX, rd2_after_ID_EX;
+  
+  wire signext, shiftl16, memtoreg, memwrite, branch, alusrc, regdst, regwrite,jump;
+  wire memtoreg_after_ID_EX, memwrite_after_ID_EX, branch_after_ID_EX, alusrc_after_ID_EX, regdst_after_ID_EX, regwrite_after_ID_EX,jump_after_ID_EX;
+  wire [2:0] alucontrol;
+  
+  wire [31:0] imm_val_after_ID_EX, shifted16_val_after_ID_EX, inst20_16_after_ID_EX, inst15_11_after_ID_EX;
 
   adder pcadd1(
     .a (pc),
     .b (32'b100),
     .y (pcplus4));
-
-  sl2 immsh(
-    .a (signimm),
-    .y (signimmsh));
-				 
-  adder pcadd2(
-    .a (pcplus4),
-    .b (signimmsh),
-    .y (pcbranch));
-
-  mux2 #(32) pcbrmux(
-    .d0  (pcplus4),
-    .d1  (pcbranch),
-    .s   (pcsrc),
-    .y   (pcnextbr));
-
-  mux2 #(32) pcmux(
-    .d0   (pcnextbr),
-    .d1   ({pcplus4[31:28], instr[25:0], 2'b00}),
-    .s    (jump),
-    .y    (pcnext));
-
+  
+  IF_ID if_id( 
+  .clk (clk), 
+  .instr (instr), 
+  .pc_added_four (pcplus4), 
+  .instr_out (instr_after_IF_ID), 
+  .pc_out (pc_after_IF_ID));
+  
+  controller c( 
+  .op (instr_after_IF_ID[31:26]), 
+  .funct (instr_after_IF_ID[5:0]), 
+  .signext (signext), 
+  .shiftl16 (shiftl16), 
+  .memtoreg (memtoreg), 
+  .memwrite (memwrite), 
+  .branch (branch), 
+  .alusrc (alusrc), 
+  .regdst (regdst), 
+  .regwrite (regwrite), 
+  .jump (jump), 
+  .alucontrol (alucontrol));
+ 
   // register file logic
   regfile rf(
     .clk     (clk),
-    .we      (regwrite),
-    .ra1     (instr[25:21]),
-    .ra2     (instr[20:16]),
+    .we      (regwrite_after_ID_EX),
+    .ra1     (instr_after_IF_ID[25:21]),
+    .ra2     (instr_after_IF_ID[20:16]),
     .wa      (writereg),
     .wd      (result),
-    .rd1     (srca),
-    .rd2     (writedata));
-
-  mux2 #(5) wrmux(
-    .d0  (instr[20:16]),
-    .d1  (instr[15:11]),
-    .s   (regdst),
-    .y   (writereg));
-
-  mux2 #(32) resmux(
-    .d0 (aluout),
-    .d1 (readdata),
-    .s  (memtoreg),
-    .y  (result));
-
+    .rd1     (rd1),
+    .rd2     (rd2));
+ 
   sign_zero_ext sze(
-    .a       (instr[15:0]),
+    .a       (instr_after_IF_ID[15:0]),
     .signext (signext),
     .y       (signimm[31:0]));
 
@@ -233,16 +235,90 @@ module datapath(input         clk, reset,
     .a         (signimm[31:0]),
     .shiftl16  (shiftl16),
     .y         (shiftedimm[31:0]));
+	 
+  ID_EX id_ex( 
+  .clk (clk), 
+  .memtoreg (memtoreg), 
+  .memwrite (memwrite), 
+  .branch (branch), 
+  .alusrc (alusrc), 
+  .regdst (regdst), 
+  .regwrite (regwrite), 
+  .jump (jump),
+  .pc (pc_after_IF_ID), 
+  .rd1 (rd1),
+  .rd2 (rd2),
+  .imm_val (signimm),
+  .shifted16_val (shiftedimm),
+  .inst20_16 (instr_after_IF_ID[20:16]),
+  .inst15_11 (instr_after_IF_ID[15:11]),
+  .memtoreg_out (memtoreg_after_ID_EX),
+  .memwrite_out (memwrite_after_ID_EX),
+  .branch_out (branch_after_ID_EX),
+  .alusrc_out (alusrc_after_ID_EX),
+  .regdst_out (regdst_after_ID_EX),
+  .regwrite_out (regwrite_after_ID_EX),
+  .jump_out (jump_after_ID_EX),
+  .pc_out (pc_after_ID_EX),
+  .rd1_out (rd1_after_ID_EX),
+  .rd2_out (rd2_after_ID_EX),
+  .imm_val_out (imm_val_after_ID_EX),
+  .shifted16_val_out (shifted16_val_after_ID_EX),
+  .inst20_16_out (inst20_16_after_ID_EX),
+  .inst15_11_out (inst15_11_after_ID_EX));
+  
+  
+  
+  // next PC logic
+  flopr #(32) pcreg(
+    .clk   (clk),
+    .reset (reset),
+    .d     (pcnext),
+    .q     (pc));
+
+  sl2 immsh(
+    .a (imm_val_after_ID_EX),
+    .y (signimmsh));
+				 
+  adder pcadd2(
+    .a (pc_after_ID_EX),
+    .b (signimmsh),
+    .y (pcbranch));
+
+  mux2 #(32) pcbrmux(
+    .d0  (pc_after_ID_EX),
+    .d1  (pcbranch),
+    .s   (pcsrc),
+    .y   (pcnextbr));
+
+  mux2 #(32) pcmux(
+    .d0   (pcnextbr),
+    .d1   ({pc_after_ID_EX[31:28], instr[25:0], 2'b00}),
+    .s    (jump_after_ID_EX),
+    .y    (pcnext));
+
+
+  mux2 #(5) wrmux(
+    .d0  (inst20_16_after_ID_EX[20:16]),
+    .d1  (inst15_11_after_ID_EX[15:11]),
+    .s   (regdst_after_ID_EX),
+    .y   (writereg));
+
+  mux2 #(32) resmux(
+    .d0 (aluout),
+    .d1 (readdata),
+    .s  (memtoreg_after_ID_EX),
+    .y  (result));
 
   // ALU logic
   mux2 #(32) srcbmux(
-    .d0 (writedata),
-    .d1 (shiftedimm[31:0]),
-    .s  (alusrc),
+    .d0 (rd2_after_ID_EX),
+    .d1 (shifted16_val_after_ID_EX),
+    .s  (alusrc_after_ID_EX),
     .y  (srcb));
 
   alu alu(
-    .a       (srca),
+    .a       (rd1_after_ID_EX),
     .b       (srcb),
     .alucont (alucontrol),
     .result  (aluout),
