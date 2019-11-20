@@ -33,6 +33,7 @@ module mips(input         clk, reset,
 endmodule
 
 module controller(input  [5:0] op, funct,
+						input        keep_write,
                   output       signext,
                   output       shiftl16,
                   output       memtoreg, memwrite,
@@ -45,6 +46,7 @@ module controller(input  [5:0] op, funct,
 
   maindec md(
     .op       (op),
+	 .keep_write (keep_write),
     .signext  (signext),
     .shiftl16 (shiftl16),
     .memtoreg (memtoreg),
@@ -59,12 +61,14 @@ module controller(input  [5:0] op, funct,
   aludec ad( 
     .funct      (funct),
     .aluop      (aluop), 
+	 .keep_write (keep_write),
     .alucontrol (alucontrol));
 
 endmodule
 
 
 module maindec(input  [5:0] op,
+					input        keep_write,
                output       signext,
                output       shiftl16,
                output       memtoreg, memwrite,
@@ -79,7 +83,8 @@ module maindec(input  [5:0] op,
           memtoreg, jump, aluop} = controls;
 
   always @(*)
-    case(op)
+    if (keep_write == 1'b0) controls <= #`mydelay 11'b00000000000;
+    else case(op)
       6'b000000: controls <= #`mydelay 11'b00110000011; // Rtype
       6'b100011: controls <= #`mydelay 11'b10101001000; // LW
       6'b101011: controls <= #`mydelay 11'b10001010000; // SW
@@ -96,10 +101,12 @@ endmodule
 
 module aludec(input      [5:0] funct,
               input      [1:0] aluop,
+				  input            keep_write,
               output reg [2:0] alucontrol);
 
   always @(*)
-    case(aluop)
+    if (keep_write == 1'b0) alucontrol <= 3'b000;
+    else case(aluop)
       2'b00: alucontrol <= #`mydelay 3'b010;  // add
       2'b01: alucontrol <= #`mydelay 3'b110;  // sub
       2'b10: alucontrol <= #`mydelay 3'b001;  // or
@@ -117,6 +124,39 @@ module aludec(input      [5:0] funct,
     
 endmodule
 
+module forward_mux(input [31:0] val_from_ID_EX,
+						input [31:0] val_from_EX_MEM,
+						input [31:0] val_from_MEM_WB,
+						input [1:0] control,
+						output reg [31:0] val);
+						
+  always @(*)
+    case(control)
+	 2'b00: val <= #`mydelay val_from_ID_EX;
+	 2'b01: val <= #`mydelay val_from_EX_MEM;
+	 2'b10: val <= #`mydelay val_from_MEM_WB;
+	 endcase
+endmodule
+
+module forwarding_unit(input [4:0] rs, rt, rd_EX_MEM, rd_MEM_WB, 
+							  input regwrite_EX_MEM, regwrite_MEM_WB,
+							 output reg [1:0] control_rs, control_rt);
+  always @(*)
+    begin
+	   if ((rt == rd_MEM_WB) && regwrite_MEM_WB == 1'b1)
+			control_rt <= 2'b10;
+		else if (rt == rd_EX_MEM)
+			control_rt <= 2'b01;
+		else control_rt <= 2'b00;
+		
+		if ((rs == rd_MEM_WB) && regwrite_EX_MEM == 1'b1)
+			control_rs <= 2'b10;
+		else if (rs == rd_EX_MEM)
+			control_rs <= 2'b01;
+		else control_rs <= 2'b00;
+	  end
+endmodule
+
 module IF_ID(input clk,
 				 input [31:0] instr,
 				 input [31:0] pc_added_four,
@@ -130,19 +170,30 @@ module IF_ID(input clk,
 	 end
 endmodule
 
+module hazard_detection_unit (input [4:0] rs_IF_ID, rt_IF_ID, rt,
+										input memtoreg,
+										output reg keep_write);
+
+  always @(*)
+    if ((memtoreg == 1'b1 && ((rt == rt_IF_ID) || (rt == rs_IF_ID))))
+		keep_write <= #`mydelay 1'b0;
+	 else keep_write <= #`mydelay 1'b1;
+	 
+endmodule
+
 module ID_EX(input clk, 
 				 input memtoreg, memwrite, branch, alusrc, regdst, regwrite, jump,
 				 input [2:0] alucontrol,
 				 input [31:0] pc, 
 				 input [31:0] rd1, rd2,
 				 input [31:0] imm_val,
-				 input [4:0] inst20_16, inst15_11,
+				 input [4:0] inst25_21, inst20_16, inst15_11,
 				 output reg memtoreg_out, memwrite_out, branch_out, alusrc_out, regdst_out, regwrite_out, jump_out, 
 				 output reg [2:0] alucontrol_out, 
 				 output reg [31:0] pc_out, 
 				 output reg [31:0] rd1_out, rd2_out, 
 				 output reg [31:0] imm_val_out,
-				 output reg [4:0] inst20_16_out, inst15_11_out);
+				 output reg [4:0] inst25_21_out, inst20_16_out, inst15_11_out);
 				 
   always @(posedge clk)
     begin
@@ -158,6 +209,7 @@ module ID_EX(input clk,
 		rd1_out <= #`mydelay rd1;
 		rd2_out <= #`mydelay rd2;
 		imm_val_out <= #`mydelay imm_val;
+		inst25_21_out <= #`mydelay inst25_21;
 		inst20_16_out <= #`mydelay inst20_16;
 		inst15_11_out <= #`mydelay inst15_11;
 	 end
@@ -229,7 +281,8 @@ module datapath(input         clk, reset,
   wire memtoreg_after_ID_EX, memwrite_after_ID_EX, branch_after_ID_EX, alusrc_after_ID_EX, regdst_after_ID_EX, regwrite_after_ID_EX,jump_after_ID_EX;
   wire [2:0] alucontrol, alucontrol_after_ID_EX;
   
-  wire [31:0] imm_val_after_ID_EX, shifted16_val_after_ID_EX, inst20_16_after_ID_EX, inst15_11_after_ID_EX;
+  wire [31:0] imm_val_after_ID_EX, shifted16_val_after_ID_EX;
+  wire [4:0] inst25_21_after_ID_EX, inst20_16_after_ID_EX, inst15_11_after_ID_EX;
   
   wire memtoreg_after_EX_MEM, memwrite_after_EX_MEM, branch_after_EX_MEM, regwrite_after_EX_MEM,jump_after_EX_MEM;
   
@@ -240,6 +293,12 @@ module datapath(input         clk, reset,
   wire [4:0] regdst_addr, regdst_addr_after_MEM_WB;
   
   wire memtoreg_after_MEM_WB, regwrite_after_MEM_WB, aluresult_after_MEM_WB, readdata_after_MEM_WB;
+  
+  wire [1:0] control_rs, control_rt;
+  
+  wire [31:0] forwarded_rs_data, forwarded_rt_data;
+  
+  wire keep_write;
 
   adder pcadd1(
     .a (final_pc),
@@ -247,7 +306,7 @@ module datapath(input         clk, reset,
     .y (pcplus4));
   
   IF_ID if_id( 
-  .clk (clk), 
+  .clk (clk & keep_write), 
   .instr (instr), 
   .pc_added_four (pcplus4), 
   .instr_out (instr_after_IF_ID), 
@@ -256,6 +315,7 @@ module datapath(input         clk, reset,
   controller c( 
   .op (instr_after_IF_ID[31:26]), 
   .funct (instr_after_IF_ID[5:0]), 
+  .keep_write (keep_write),
   .signext (signext), 
   .shiftl16 (shiftl16), 
   .memtoreg (memtoreg), 
@@ -302,6 +362,7 @@ module datapath(input         clk, reset,
   .rd1 (rd1),
   .rd2 (rd2),
   .imm_val (shiftedimm),
+  .inst25_21 (instr_after_IF_ID[25:21]),
   .inst20_16 (instr_after_IF_ID[20:16]),
   .inst15_11 (instr_after_IF_ID[15:11]),
   .memtoreg_out (memtoreg_after_ID_EX),
@@ -316,6 +377,7 @@ module datapath(input         clk, reset,
   .rd1_out (rd1_after_ID_EX),
   .rd2_out (rd2_after_ID_EX),
   .imm_val_out (imm_val_after_ID_EX),
+  .inst25_21_out (inst25_21_after_ID_EX),
   .inst20_16_out (inst20_16_after_ID_EX),
   .inst15_11_out (inst15_11_after_ID_EX));
   
@@ -326,7 +388,7 @@ module datapath(input         clk, reset,
     .y   (writereg));
 
   alu alu(
-    .a       (rd1_after_ID_EX),
+    .a       (forwarded_rs_data),
     .b       (srcb),
     .alucont (alucontrol_after_ID_EX),
     .result  (aluout),
@@ -367,7 +429,7 @@ module datapath(input         clk, reset,
 	 .regdst_addr_out (regdst_addr)
 	 );
   flopr #(32) pcreg(
-    .clk   (clk),
+    .clk   (clk & keep_write),
     .reset (reset),
     .d     (pcnext),
     .q     (final_pc));
@@ -394,7 +456,7 @@ module datapath(input         clk, reset,
 
   // ALU logic
   mux2 #(32) srcbmux(
-    .d0 (rd2_after_ID_EX),
+    .d0 (forwarded_rt_data),
     .d1 (imm_val_after_ID_EX),
     .s  (alusrc_after_ID_EX),
     .y  (srcb));
@@ -410,6 +472,36 @@ module datapath(input         clk, reset,
   .memtoreg_out (memtoreg_after_MEM_WB),
   .regdst_addr_out (regdst_addr_after_MEM_WB),
   .readdata_out (readdata_after_MEM_WB),
-  .aluresult_out(aluresult_after_MEM_WB),
-  );
+  .aluresult_out(aluresult_after_MEM_WB));
+  
+  forwarding_unit fu(
+  .rs (inst25_21_after_ID_EX),
+  .rt (inst20_16_after_ID_EX),
+  .rd_EX_MEM (regdst_addr), 
+  .rd_MEM_WB (regdst_addr_after_MEM_WB), 
+  .regwrite_EX_MEM (regwrite_after_EX_MEM),
+  .regwrite_MEM_WB (regwrite_after_MEM_WB),
+  .control_rs (control_rs),
+  .control_rt (control_rt));
+  
+  forward_mux forward_rs_mux( 
+  .val_from_ID_EX (rd1_after_ID_EX),
+  .val_from_EX_MEM (final_aluout), 
+  .val_from_MEM_WB (result),
+  .control (control_rs),
+  .val (forwarded_rs_data));
+  
+  forward_mux forward_rt_mux( 
+  .val_from_ID_EX (rd2_after_ID_EX),
+  .val_from_EX_MEM (final_aluout), 
+  .val_from_MEM_WB (result),
+  .control (control_rt),
+  .val (forwarded_rt_data));
+  
+  hazard_detection_unit hzu(
+  .rs_IF_ID (instr_after_IF_ID[25:21]), 
+  .rt_IF_ID (instr_after_IF_ID[20:16]),
+  .rt (inst20_16_after_ID_EX), 
+  .memtoreg (memtoreg_after_ID_EX),
+  .keep_write (keep_write));
 endmodule
