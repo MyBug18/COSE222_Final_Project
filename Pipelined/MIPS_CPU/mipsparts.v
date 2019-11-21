@@ -177,11 +177,6 @@ module regfile(input         clk,
 
   reg [31:0] rf[31:0];
 
-  // three ported register file
-  // read two ports combinationally
-  // write third port on rising edge of clock
-  // register 0 hardwired to 0
-
   always @(posedge clk)
     if (we) rf[wa] <= #`mydelay wd;	
 
@@ -191,19 +186,302 @@ endmodule
 
 `endif
 
+module IF_ID(input 	         clk, reset,
+				   input             keep_write,
+				   input      [31:0] pc_plus4_in,
+				   input      [31:0] instr_in,
+				   output reg [31:0] pc_plus4,
+				   output reg [31:0] instr);
+	
+	always @(posedge clk) begin
+		if (reset) begin
+			pc_plus4 <= #`mydelay 1'b0;
+			instr   <= #`mydelay 1'b0;
+		end
+		else if (keep_write) begin
+			pc_plus4 <= #`mydelay pc_plus4_in;
+			instr   <= #`mydelay instr_in;
+		end
+	end
+endmodule
+
+module ID_EX(input 	         clk, reset,
+				   input      [31:0] pc_plus4_in,
+				   input      [31:0] rd1_in,
+				   input      [31:0] rd2_in,
+				   input      [31:0] immex_in,
+				   input      [31:0] instr_in,
+					input 	  [4:0]	rs_in,
+					input 	  [4:0]	rt_in,
+					input 	  [4:0]	rd_in,
+				   input             shiftl16_in,
+				   input             regdst_in,
+				   input      [3:0]  alucontrol_in,
+				   input             alusrc_in,
+					input				branch_in,
+					input				branch_bne_in,
+					input				jump_in,
+				   input             memwrite_in,  
+				   input             isjal_in,
+				   input             regwrite_in,
+				   input             memtoreg_in,
+				   output reg [31:0] pc_plus4,
+				   output reg [31:0] rd1,
+				   output reg [31:0] rd2,
+				   output reg [31:0] immex,
+				   output reg [31:0] instr,
+					output reg [4:0]	rs,
+					output reg [4:0]	rt,
+					output reg [4:0]	rd,
+				   output reg        shiftl16,
+				   output reg        regdst,
+				   output reg [3:0]  alucontrol,
+				   output reg        alusrc,
+					output reg			branch,
+					output reg			branch_bne,
+					output reg			jump,
+				   output reg        memwrite,  
+				   output reg        isjal,
+				   output reg        regwrite,
+				   output reg        memtoreg
+				   );
+	
+	always @(posedge clk) begin
+		if (reset) begin
+			pc_plus4   <= #`mydelay 1'b0;
+			rd1       <= #`mydelay 1'b0;
+			rd2       <= #`mydelay 1'b0;
+			immex     <= #`mydelay 1'b0;
+			instr     <= #`mydelay 1'b0;
+			rs        <= #`mydelay 1'b0;
+			rt        <= #`mydelay 1'b0;
+			rd        <= #`mydelay 1'b0;
+			shiftl16  <= #`mydelay 1'b0; 
+			regdst    <= #`mydelay 1'b0; 
+			alucontrol<= #`mydelay 1'b0; 
+			alusrc    <= #`mydelay 1'b0; 
+			branch    <= #`mydelay 1'b0; 
+			branch_bne   <= #`mydelay 1'b0; 
+			jump      <= #`mydelay 1'b0; 
+			memwrite  <= #`mydelay 1'b0; 
+			isjal  <= #`mydelay 1'b0; 
+			regwrite  <= #`mydelay 1'b0; 
+			memtoreg  <= #`mydelay 1'b0; 
+		end
+		else begin
+			pc_plus4   <= #`mydelay pc_plus4_in;
+			rd1       <= #`mydelay rd1_in;
+			rd2       <= #`mydelay rd2_in;
+			immex     <= #`mydelay immex_in;
+			instr     <= #`mydelay instr_in;
+			rs        <= #`mydelay rs_in;
+			rt        <= #`mydelay rt_in;
+			rd        <= #`mydelay rd_in;
+			shiftl16  <= #`mydelay shiftl16_in;  
+			regdst    <= #`mydelay regdst_in;    
+			alucontrol<= #`mydelay alucontrol_in;     
+			alusrc    <= #`mydelay alusrc_in;      
+			branch    <= #`mydelay branch_in; 
+			branch_bne   <= #`mydelay branch_bne_in; 
+			jump      <= #`mydelay jump_in; 
+			memwrite  <= #`mydelay memwrite_in;  
+			isjal  <= #`mydelay isjal_in;  
+			regwrite  <= #`mydelay regwrite_in;  
+			memtoreg  <= #`mydelay memtoreg_in;  
+		end
+	end
+endmodule
+
+module EX_MEM(input 	         clk, reset,
+				   input      [31:0] pc_plus4_in,
+				   input      [31:0] aluout_in,
+				   input      [31:0] write_inata_in,
+				   input      [4:0]  writereg_in,
+				   input             memwrite_in,
+				   input             isjal_in,   
+				   input             regwrite_in,   
+				   input             memtoreg_in,   
+				   output reg [31:0] pc_plus4,
+				   output reg [31:0] aluout,
+				   output reg [31:0] write_inata,
+				   output reg [4:0]  writereg,
+				   output reg        memwrite,
+				   output reg        isjal,   
+				   output reg        regwrite,   
+				   output reg        memtoreg   
+					);
+				   
+	always @(posedge clk) begin
+		if (reset) begin
+			pc_plus4      <= #`mydelay 1'b0;
+			aluout       <= #`mydelay 1'b0;
+			write_inata          <= #`mydelay 1'b0;
+			writereg     <= #`mydelay 1'b0;
+			memwrite     <= #`mydelay 1'b0;
+			isjal  <= #`mydelay 1'b0;
+			regwrite     <= #`mydelay 1'b0;
+			memtoreg     <= #`mydelay 1'b0;
+		end
+		else begin
+			pc_plus4      <= #`mydelay pc_plus4_in;
+			aluout       <= #`mydelay aluout_in;
+			write_inata          <= #`mydelay write_inata_in;
+			writereg     <= #`mydelay writereg_in;
+			memwrite     <= #`mydelay memwrite_in;
+			isjal     <= #`mydelay isjal_in;
+			regwrite     <= #`mydelay regwrite_in;
+			memtoreg     <= #`mydelay memtoreg_in;
+		end
+	end
+endmodule
+
+module MEM_WB(input 	         clk, reset,
+				   input      [31:0] pc_plus4_in,
+				   input      [31:0] readdata_in,
+				   input      [31:0] aluout_in,
+				   input      [4:0]  writereg_in,
+				   input             isjal_in, 
+				   input             regwrite_in, 
+				   input             memtoreg_in, 
+				   output reg [31:0] pc_plus4,
+				   output reg [31:0] readdata,
+				   output reg [31:0] aluout,
+				   output reg [4:0]  writereg,
+				   output reg        isjal,   
+				   output reg        regwrite,   
+				   output reg        memtoreg   
+				   );
+	
+	always @(posedge clk) begin
+		if (reset) begin
+			pc_plus4      <= #`mydelay 1'b0;
+			readdata     <= #`mydelay 1'b0;
+			aluout       <= #`mydelay 1'b0;
+			writereg     <= #`mydelay 1'b0;
+			isjal     <= #`mydelay 1'b0;
+			regwrite     <= #`mydelay 1'b0;
+			memtoreg     <= #`mydelay 1'b0;
+		end
+		else begin
+			pc_plus4      <= #`mydelay pc_plus4_in;
+			readdata     <= #`mydelay readdata_in;
+			aluout       <= #`mydelay aluout_in;
+			writereg     <= #`mydelay writereg_in;
+			isjal     <= #`mydelay isjal_in;
+			regwrite     <= #`mydelay regwrite_in;
+			memtoreg     <= #`mydelay memtoreg_in;
+		end
+	end
+endmodule
+
+module is_equal(input  [31:0] d0, d1,
+              output  reg eq);
+
+  always @(*)
+	begin
+	   if (d0 == d1)  eq <= 1'b1;
+	   else          eq <= 1'b0;
+	end
+
+endmodule
+
+module brc_or_jump(input [3:0] alucontrol,
+					  input 		 branch,
+					  input 		 branch_bne,
+					  input 		 jump,
+					  input 		 aluzero,
+					  output reg flush);
+  
+  always @(*)
+	begin
+		if (aluzero == 1 && branch == 1 && branch_bne == 0) flush <= 1'b1;
+		else if (aluzero == 0 && branch == 1 && branch_bne == 1) flush <= 1'b1;
+		else if (alucontrol == 4'b1010) flush <= 1'b1;
+		else if (jump == 1) flush <= 1'b1;
+		else flush <= 1'b0;
+	end
+	
+endmodule
+
+module forwarding_unit(input regwrite_wb, regwrite_mem,
+						input [4:0] rs, rt,
+						input [4:0] writereg_mem, writereg_wb,
+						output reg[1:0] foward_rs, foward_rt);
+						
+  always @(regwrite_mem, regwrite_wb, writereg_mem, writereg_wb, rt, rs)
+   begin
+    if       (regwrite_mem && (writereg_mem != 0) && (writereg_mem == rs)) foward_rs = 2'b01;
+	 else if  (regwrite_wb && (writereg_wb != 0) && (writereg_wb == rs)) foward_rs = 2'b10;
+	 else 
+		foward_rs = 2'b00;
+	 if       (regwrite_mem && (writereg_mem != 0) && (writereg_mem == rt)) foward_rt = 2'b01;
+	 else if  (regwrite_wb && (writereg_wb != 0) && (writereg_wb == rt)) foward_rt = 2'b10;
+	 else 
+		foward_rt = 2'b00;
+   end
+	
+endmodule
+
+module mux4 #(parameter WIDTH = 8)
+             (input  [WIDTH-1:0] d0, d1, d2, d3, 
+              input  [1:0]       s, 
+              output reg [WIDTH-1:0] y);
+
+  always@(s, d0, d1, d2, d3)
+    case(s)
+      2'b00: y = d0;
+      2'b01: y = d1;
+      2'b10: y = d2;
+      2'b11: y = d3;
+    endcase
+
+endmodule
+
+module hazard_inetect_unit(input [5:0]	op_ex,
+							input [4:0]	load_reg,
+							input [4:0]	rs_id,
+							input [4:0]	rt_id,
+							output reg	keep_write_pc,
+							output reg	keep_write_ifid,
+							output reg	flush_id_ex);
+							
+	always @(*) begin
+		if ((op_ex == 6'b100011) && ((load_reg == rs_id) || (load_reg == rt_id))) begin
+			keep_write_pc = 1'b0;
+			keep_write_ifid = 1'b0;
+			flush_id_ex = 1'b1;
+		end
+		else begin
+			keep_write_pc = 1'b1;
+			keep_write_ifid = 1'b1;
+			flush_id_ex = 1'b0;
+		end
+	end
+	
+endmodule
+
+module rf_readwrite_time(input [4:0]	writereg,
+								 input [4:0]	readreg,
+								 input [31:0]	result,
+								 input [31:0]	read,
+								 output[31:0]	realread);
+								 
+	assign #`mydelay realread = (writereg == readreg) ? result : read; 
+	
+endmodule
 
 module alu(input      [31:0] a, b, 
-           input      [2:0]  alucont, 
+           input      [3:0]  alucont, 
            output reg [31:0] result,
            output            zero);
 
-  wire [31:0] b2, sum, slt, sltu;
+  wire [31:0] b2, sum, slt, sltu, Fslt;
   wire        N, Z, C, V;
 
   assign b2 = alucont[2] ? ~b:b; 
 
   adder_32bit iadder32 (.a   (a),
-			     				.b   (b2),
+			               .b   (b2),
 								.cin (alucont[2]),
 								.sum (sum),
 								.N   (N),
@@ -215,20 +493,21 @@ module alu(input      [31:0] a, b,
   assign slt  = N ^ V ; 
 
   // unsigned lower (C clear) 
-  assign sltu = ~C ;   
+  assign sltu = ~C ;
+
+  assign Fslt = (alucont[3] == 1) ? {31'b0, sltu[0]}:{31'b0, slt[0]};   //sltu:1, slt: 0
 
   always@(*)
     case(alucont[1:0])
       2'b00: result <= #`mydelay a & b;
       2'b01: result <= #`mydelay a | b;
       2'b10: result <= #`mydelay sum;
-      2'b11: result <= #`mydelay slt;
+      2'b11: result <= #`mydelay Fslt;
     endcase
 
   assign #`mydelay zero = (result == 32'b0);
 
 endmodule
-
 
 module adder_32bit (input  [31:0] a, b, 
                     input         cin,
@@ -277,7 +556,6 @@ module adder_32bit (input  [31:0] a, b,
 
 endmodule
 
-
 module adder_1bit (input a, b, cin,
                    output sum, cout);
 
@@ -286,14 +564,11 @@ module adder_1bit (input a, b, cin,
 
 endmodule
 
-
 module adder(input [31:0] a, b,
              output [31:0] y);
 
   assign #`mydelay y = a + b;
 endmodule
-
-
 
 module sl2(input  [31:0] a,
            output [31:0] y);
@@ -301,8 +576,6 @@ module sl2(input  [31:0] a,
   // shift left by 2
   assign #`mydelay y = {a[29:0], 2'b00};
 endmodule
-
-
 
 module sign_zero_ext(input      [15:0] a,
                      input             signext,
@@ -316,10 +589,8 @@ module sign_zero_ext(input      [15:0] a,
 
 endmodule
 
-
-
 module shift_left_16(input      [31:0] a,
-		               input         shiftl16,
+		             input         shiftl16,
                      output reg [31:0] y);
 
    always @(*)
@@ -329,8 +600,6 @@ module shift_left_16(input      [31:0] a,
 	end
               
 endmodule
-
-
 
 module flopr #(parameter WIDTH = 8)
               (input                  clk, reset,
@@ -342,8 +611,6 @@ module flopr #(parameter WIDTH = 8)
     else       q <= #`mydelay d;
 
 endmodule
-
-
 
 module flopenr #(parameter WIDTH = 8)
                 (input                  clk, reset,
@@ -357,13 +624,19 @@ module flopenr #(parameter WIDTH = 8)
 
 endmodule
 
-
-
 module mux2 #(parameter WIDTH = 8)
              (input  [WIDTH-1:0] d0, d1, 
               input              s, 
               output [WIDTH-1:0] y);
 
-  assign #`mydelay y = s ? d1 : d0; 
+  assign #`mydelay y = (s == 1) ? d1 : d0; 
+
+endmodule
+
+module jrmux (input  [31:0] d0, d1, 
+              input  [3:0]  alucontrol, 
+              output [31:0] y);
+
+  assign #`mydelay y = (alucontrol[3:0] == 4'b1010) ? d1 : d0; 
 
 endmodule
