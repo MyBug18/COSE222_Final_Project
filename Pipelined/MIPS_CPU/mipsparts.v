@@ -186,10 +186,10 @@ endmodule
 
 `endif
 
-module IF_ID(input 	         clk, reset,
+module ppline_ifid(input 	         clk, reset,
 				   input             keep_write,
-				   input      [31:0] pc_plus4_in,
-				   input      [31:0] instr_in,
+				   input      [31:0] pc_plus4_d,
+				   input      [31:0] instr_d,
 				   output reg [31:0] pc_plus4,
 				   output reg [31:0] instr);
 	
@@ -199,32 +199,32 @@ module IF_ID(input 	         clk, reset,
 			instr   <= #`mydelay 1'b0;
 		end
 		else if (keep_write) begin
-			pc_plus4 <= #`mydelay pc_plus4_in;
-			instr   <= #`mydelay instr_in;
+			pc_plus4 <= #`mydelay pc_plus4_d;
+			instr   <= #`mydelay instr_d;
 		end
 	end
 endmodule
 
-module ID_EX(input 	         clk, reset,
-				   input      [31:0] pc_plus4_in,
-				   input      [31:0] rd1_in,
-				   input      [31:0] rd2_in,
-				   input      [31:0] immex_in,
-				   input      [31:0] instr_in,
-					input 	  [4:0]	rs_in,
-					input 	  [4:0]	rt_in,
-					input 	  [4:0]	rd_in,
-				   input             shiftl16_in,
-				   input             regdst_in,
-				   input      [3:0]  alucontrol_in,
-				   input             alusrc_in,
-					input				branch_in,
-					input				branch_bne_in,
-					input				jump_in,
-				   input             memwrite_in,  
-				   input             isjal_in,
-				   input             regwrite_in,
-				   input             memtoreg_in,
+module ppline_idex(input 	         clk, reset,
+				   input      [31:0] pc_plus4_d,
+				   input      [31:0] rd1_d,
+				   input      [31:0] rd2_d,
+				   input      [31:0] immex_d,
+				   input      [31:0] instr_d,
+					input 	  [4:0]	rs_d,
+					input 	  [4:0]	rt_d,
+					input 	  [4:0]	rd_d,
+				   input             shiftl16_d,
+				   input             regdst_d,  
+				   input      [3:0]  alucontrol_d,   
+				   input             alusrc_d,    
+					input					branch_d,	
+					input					branchN_d,	
+					input					jump_d,	
+				   input             memwrite_d,  
+				   input             isjal_d,
+				   input             regwrite_d,
+				   input             memtoreg_d,
 				   output reg [31:0] pc_plus4,
 				   output reg [31:0] rd1,
 				   output reg [31:0] rd2,
@@ -234,12 +234,12 @@ module ID_EX(input 	         clk, reset,
 					output reg [4:0]	rt,
 					output reg [4:0]	rd,
 				   output reg        shiftl16,
-				   output reg        regdst,
-				   output reg [3:0]  alucontrol,
-				   output reg        alusrc,
-					output reg			branch,
-					output reg			branch_bne,
-					output reg			jump,
+				   output reg        regdst,  
+				   output reg [3:0]  alucontrol,   
+				   output reg        alusrc,   
+					output reg			branch,	
+					output reg			branchN,	
+					output reg			jump,	
 				   output reg        memwrite,  
 				   output reg        isjal,
 				   output reg        regwrite,
@@ -256,66 +256,69 @@ module ID_EX(input 	         clk, reset,
 			rs        <= #`mydelay 1'b0;
 			rt        <= #`mydelay 1'b0;
 			rd        <= #`mydelay 1'b0;
-			shiftl16  <= #`mydelay 1'b0; 
-			regdst    <= #`mydelay 1'b0; 
-			alucontrol<= #`mydelay 1'b0; 
-			alusrc    <= #`mydelay 1'b0; 
-			branch    <= #`mydelay 1'b0; 
-			branch_bne   <= #`mydelay 1'b0; 
-			jump      <= #`mydelay 1'b0; 
+			shiftl16  <= #`mydelay 1'b0;
+			regdst    <= #`mydelay 1'b0;
+			alucontrol<= #`mydelay 1'b0;
+			alusrc    <= #`mydelay 1'b0;
+			branch    <= #`mydelay 1'b0;
+			branchN   <= #`mydelay 1'b0;
+			jump      <= #`mydelay 1'b0;
 			memwrite  <= #`mydelay 1'b0; 
-			isjal  <= #`mydelay 1'b0; 
-			regwrite  <= #`mydelay 1'b0; 
-			memtoreg  <= #`mydelay 1'b0; 
+			isjal  <= #`mydelay 1'b0;
+			regwrite  <= #`mydelay 1'b0;
+			memtoreg  <= #`mydelay 1'b0;
 		end
 		else begin
-			pc_plus4   <= #`mydelay pc_plus4_in;
-			rd1       <= #`mydelay rd1_in;
-			rd2       <= #`mydelay rd2_in;
-			immex     <= #`mydelay immex_in;
-			instr     <= #`mydelay instr_in;
-			rs        <= #`mydelay rs_in;
-			rt        <= #`mydelay rt_in;
-			rd        <= #`mydelay rd_in;
-			shiftl16  <= #`mydelay shiftl16_in;  
-			regdst    <= #`mydelay regdst_in;    
-			alucontrol<= #`mydelay alucontrol_in;     
-			alusrc    <= #`mydelay alusrc_in;      
-			branch    <= #`mydelay branch_in; 
-			branch_bne   <= #`mydelay branch_bne_in; 
-			jump      <= #`mydelay jump_in; 
-			memwrite  <= #`mydelay memwrite_in;  
-			isjal  <= #`mydelay isjal_in;  
-			regwrite  <= #`mydelay regwrite_in;  
-			memtoreg  <= #`mydelay memtoreg_in;  
+			pc_plus4   <= #`mydelay pc_plus4_d;
+			rd1       <= #`mydelay rd1_d;
+			rd2       <= #`mydelay rd2_d;
+			immex     <= #`mydelay immex_d;
+			instr     <= #`mydelay instr_d;
+			rs        <= #`mydelay rs_d;
+			rt        <= #`mydelay rt_d;
+			rd        <= #`mydelay rd_d;
+			shiftl16  <= #`mydelay shiftl16_d;
+			regdst    <= #`mydelay regdst_d;  
+			alucontrol<= #`mydelay alucontrol_d;   
+			alusrc    <= #`mydelay alusrc_d;    
+			branch    <= #`mydelay branch_d;
+			branchN   <= #`mydelay branchN_d;
+			jump      <= #`mydelay jump_d;
+			memwrite  <= #`mydelay memwrite_d;  
+			isjal  <= #`mydelay isjal_d;
+			regwrite  <= #`mydelay regwrite_d;
+			memtoreg  <= #`mydelay memtoreg_d;
 		end
 	end
 endmodule
 
-module EX_MEM(input 	         clk, reset,
-				   input      [31:0] pc_plus4_in,
-				   input      [31:0] aluout_in,
-				   input      [31:0] write_inata_in,
-				   input      [4:0]  writereg_in,
-				   input             memwrite_in,
-				   input             isjal_in,   
-				   input             regwrite_in,   
-				   input             memtoreg_in,   
+module ppline_exmem(input 	         clk, reset,
+				   input      [31:0] pc_plus4_d,
+				   input             aluzero_d,
+				   input      [31:0] aluout_d,
+				   input      [31:0] write_data_d,
+				   input      [4:0]  writereg_d,
+				   input             memwrite_d,
+				   input             isjal_d, 
+				   input             regwrite_d, 
+				   input             memtoreg_d, 
 				   output reg [31:0] pc_plus4,
+				   output reg        aluzero,
 				   output reg [31:0] aluout,
-				   output reg [31:0] write_inata,
+				   output reg [31:0] write_data,
 				   output reg [4:0]  writereg,
 				   output reg        memwrite,
-				   output reg        isjal,   
-				   output reg        regwrite,   
-				   output reg        memtoreg   
+				   output reg        isjal, 
+				   output reg        regwrite, 
+				   output reg        memtoreg 
 					);
 				   
 	always @(posedge clk) begin
 		if (reset) begin
 			pc_plus4      <= #`mydelay 1'b0;
+			aluzero      <= #`mydelay 1'b0;
 			aluout       <= #`mydelay 1'b0;
-			write_inata          <= #`mydelay 1'b0;
+			write_data          <= #`mydelay 1'b0;
 			writereg     <= #`mydelay 1'b0;
 			memwrite     <= #`mydelay 1'b0;
 			isjal  <= #`mydelay 1'b0;
@@ -323,33 +326,34 @@ module EX_MEM(input 	         clk, reset,
 			memtoreg     <= #`mydelay 1'b0;
 		end
 		else begin
-			pc_plus4      <= #`mydelay pc_plus4_in;
-			aluout       <= #`mydelay aluout_in;
-			write_inata          <= #`mydelay write_inata_in;
-			writereg     <= #`mydelay writereg_in;
-			memwrite     <= #`mydelay memwrite_in;
-			isjal     <= #`mydelay isjal_in;
-			regwrite     <= #`mydelay regwrite_in;
-			memtoreg     <= #`mydelay memtoreg_in;
+			pc_plus4      <= #`mydelay pc_plus4_d;
+			aluzero      <= #`mydelay aluzero_d;
+			aluout       <= #`mydelay aluout_d;
+			write_data          <= #`mydelay write_data_d;
+			writereg     <= #`mydelay writereg_d;
+			memwrite     <= #`mydelay memwrite_d;
+			isjal     <= #`mydelay isjal_d;
+			regwrite     <= #`mydelay regwrite_d;
+			memtoreg     <= #`mydelay memtoreg_d;
 		end
 	end
 endmodule
 
-module MEM_WB(input 	         clk, reset,
-				   input      [31:0] pc_plus4_in,
-				   input      [31:0] readdata_in,
-				   input      [31:0] aluout_in,
-				   input      [4:0]  writereg_in,
-				   input             isjal_in, 
-				   input             regwrite_in, 
-				   input             memtoreg_in, 
+module ppline_memwb(input 	         clk, reset,
+				   input      [31:0] pc_plus4_d,
+				   input      [31:0] readdata_d,
+				   input      [31:0] aluout_d,
+				   input      [4:0]  writereg_d,
+				   input             isjal_d,
+				   input             regwrite_d,
+				   input             memtoreg_d,
 				   output reg [31:0] pc_plus4,
 				   output reg [31:0] readdata,
 				   output reg [31:0] aluout,
 				   output reg [4:0]  writereg,
-				   output reg        isjal,   
-				   output reg        regwrite,   
-				   output reg        memtoreg   
+				   output reg        isjal, 
+				   output reg        regwrite, 
+				   output reg        memtoreg 
 				   );
 	
 	always @(posedge clk) begin
@@ -363,13 +367,13 @@ module MEM_WB(input 	         clk, reset,
 			memtoreg     <= #`mydelay 1'b0;
 		end
 		else begin
-			pc_plus4      <= #`mydelay pc_plus4_in;
-			readdata     <= #`mydelay readdata_in;
-			aluout       <= #`mydelay aluout_in;
-			writereg     <= #`mydelay writereg_in;
-			isjal     <= #`mydelay isjal_in;
-			regwrite     <= #`mydelay regwrite_in;
-			memtoreg     <= #`mydelay memtoreg_in;
+			pc_plus4      <= #`mydelay pc_plus4_d;
+			readdata     <= #`mydelay readdata_d;
+			aluout       <= #`mydelay aluout_d;
+			writereg     <= #`mydelay writereg_d;
+			isjal     <= #`mydelay isjal_d;
+			regwrite     <= #`mydelay regwrite_d;
+			memtoreg     <= #`mydelay memtoreg_d;
 		end
 	end
 endmodule
@@ -385,17 +389,17 @@ module is_equal(input  [31:0] d0, d1,
 
 endmodule
 
-module brc_or_jump(input [3:0] alucontrol,
+module flowcheck(input [3:0] alucontrol,
 					  input 		 branch,
-					  input 		 branch_bne,
+					  input 		 branchN,
 					  input 		 jump,
 					  input 		 aluzero,
 					  output reg flush);
   
   always @(*)
 	begin
-		if (aluzero == 1 && branch == 1 && branch_bne == 0) flush <= 1'b1;
-		else if (aluzero == 0 && branch == 1 && branch_bne == 1) flush <= 1'b1;
+		if (aluzero == 1 && branch == 1 && branchN == 0) flush <= 1'b1;
+		else if (aluzero == 0 && branch == 1 && branchN == 1) flush <= 1'b1;
 		else if (alucontrol == 4'b1010) flush <= 1'b1;
 		else if (jump == 1) flush <= 1'b1;
 		else flush <= 1'b0;
@@ -403,7 +407,7 @@ module brc_or_jump(input [3:0] alucontrol,
 	
 endmodule
 
-module forwarding_unit(input regwrite_wb, regwrite_mem,
+module forwarding(input regwrite_wb, regwrite_mem,
 						input [4:0] rs, rt,
 						input [4:0] writereg_mem, writereg_wb,
 						output reg[1:0] foward_rs, foward_rt);
@@ -422,6 +426,8 @@ module forwarding_unit(input regwrite_wb, regwrite_mem,
 	
 endmodule
 
+
+//mux for fowarding (foward mux)
 module mux4 #(parameter WIDTH = 8)
              (input  [WIDTH-1:0] d0, d1, d2, d3, 
               input  [1:0]       s, 
@@ -437,29 +443,33 @@ module mux4 #(parameter WIDTH = 8)
 
 endmodule
 
-module hazard_inetect_unit(input [5:0]	op_ex,
+
+//for data hazard
+module hazard_detect_unit(input [5:0]	op_ex,
 							input [4:0]	load_reg,
 							input [4:0]	rs_id,
 							input [4:0]	rt_id,
 							output reg	keep_write_pc,
 							output reg	keep_write_ifid,
-							output reg	flush_id_ex);
+							output reg	flush_idex);
 							
 	always @(*) begin
 		if ((op_ex == 6'b100011) && ((load_reg == rs_id) || (load_reg == rt_id))) begin
 			keep_write_pc = 1'b0;
 			keep_write_ifid = 1'b0;
-			flush_id_ex = 1'b1;
+			flush_idex = 1'b1;
 		end
 		else begin
 			keep_write_pc = 1'b1;
 			keep_write_ifid = 1'b1;
-			flush_id_ex = 1'b0;
+			flush_idex = 1'b0;
 		end
 	end
 	
 endmodule
 
+
+//for when read same reg that writing
 module rf_readwrite_time(input [4:0]	writereg,
 								 input [4:0]	readreg,
 								 input [31:0]	result,
@@ -489,13 +499,11 @@ module alu(input      [31:0] a, b,
 								.C   (C),
 								.V   (V));
 
-  // signed less than ("N set and V clear" OR "N clear and V set")
   assign slt  = N ^ V ; 
 
-  // unsigned lower (C clear) 
   assign sltu = ~C ;
 
-  assign Fslt = (alucont[3] == 1) ? {31'b0, sltu[0]}:{31'b0, slt[0]};   //sltu:1, slt: 0
+  assign Fslt = (alucont[3] == 1) ? {31'b0, sltu[0]}:{31'b0, slt[0]};
 
   always@(*)
     case(alucont[1:0])
@@ -573,9 +581,10 @@ endmodule
 module sl2(input  [31:0] a,
            output [31:0] y);
 
-  // shift left by 2
   assign #`mydelay y = {a[29:0], 2'b00};
 endmodule
+
+
 
 module sign_zero_ext(input      [15:0] a,
                      input             signext,
@@ -590,7 +599,7 @@ module sign_zero_ext(input      [15:0] a,
 endmodule
 
 module shift_left_16(input      [31:0] a,
-		             input         shiftl16,
+		               input         shiftl16,
                      output reg [31:0] y);
 
    always @(*)

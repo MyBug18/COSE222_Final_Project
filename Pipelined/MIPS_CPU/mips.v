@@ -25,45 +25,45 @@ module mips(input         clk, reset,
    wire [4:0] rd_id, rd_ex;
    wire [4:0] rs_id, rs_ex;
    wire [4:0] writereg_ex, writereg_mem, writereg_wb;
-   wire [31:0] write_inata_ex, write_inata_mem;
+   wire [31:0] write_data_ex, write_data_mem;
    wire [31:0] pc_next;
-   wire [31:0] rd_1_i, readreg_1_ex;
-   wire [31:0] rd_2_id, readreg_2_ex;
+   wire [31:0] readreg_1_id, readreg_1_ex;
+   wire [31:0] readreg_2_id, readreg_2_ex;
    wire [31:0] signimm_id, signimm_ex;
    wire [31:0] aluout_ex, aluout_mem, aluout_wb;
    wire [31:0] memread_mem, memread_wb;
-	wire [31:0] result_wb;
-   wire aluzero_ex;
-	wire flush_pc_move, flush_ifid;
+   wire [31:0] result_wb;
+   wire aluzero_ex, aluzero_mem;
+   wire flush_pc_move, flush_ifid;
 	
-	wire [1:0] foward_rs, foward_rt;
-    
+   wire [1:0] foward_rs, foward_rt;
+  
    wire shiftl16_id, shiftl16_ex;
-   wire regdst_id,regdst_ex;
+   wire regdst_id,regdst_ex;     
    wire [1:0] aluop_id, aluop_ex;
-   wire alusrc_id, alusrc_ex;
-   wire branch_id, branch_ex;
-   wire branch_bne_id, branch_bne_ex;
-   wire jump_id, jump_ex;
+   wire alusrc_id, alusrc_ex;    
+   wire branch_id, branch_ex;   
+   wire branchN_id, branchN_ex;  
+   wire jump_id, jump_ex;     
    wire memwrite_id, memwrite_ex, memwrite_mem;
-   wire isjal_id, isjal_ex, isjal_mem, isjal_wb;
+   wire isjal_id, isjal_ex, isjal_mem, isjal_wb;  
    wire regwrite_id, regwrite_ex, regwrite_mem, regwrite_wb;
-   wire memtoreg_id, memtoreg_ex, memtoreg_mem, memtoreg_wb;
+   wire memtoreg_id, memtoreg_ex, memtoreg_mem, memtoreg_wb;              
   
    assign instr_if = instr;
    assign memread_mem = memreaddata;
    assign memwrite = memwrite_mem;
    assign memaddr = aluout_mem;
-   assign memwritedata = write_inata_mem;
+   assign memwritedata = write_data_mem;
 	
-	wire flush_id_ex_or_reset;
-	wire flush_id_ex;
+	wire flush_idex_or_reset;
+	wire flush_idex;
 	wire keep_write_pc, keep_write_ifid;
-	assign flush_id_ex_or_reset = flush_pc_move | flush_id_ex | reset;
+	assign flush_idex_or_reset = flush_pc_move | flush_idex | reset;
 	
 	assign flush_ifid = flush_pc_move | reset;
   
-	IF_STAGE if_stage(
+	if_part if_part(
 		.clk        (clk),
 		.reset      (reset),
 		.keep_write     (keep_write_pc),
@@ -71,72 +71,72 @@ module mips(input         clk, reset,
 		.pc         (pc),
 		.pc_plus4    (pc_plus4_if));
 		
-	IF_ID if_id(
+	ppline_ifid ff_ifid(
 		.clk       (clk),
 		.reset     (flush_ifid),
 		.keep_write    (keep_write_ifid),
-		.pc_plus4_in (pc_plus4_if),
-		.instr_in   (instr_if),
+		.pc_plus4_d (pc_plus4_if),
+		.instr_d   (instr_if),
 		.pc_plus4   (pc_plus4_id),
 		.instr     (instr_id));
 		
-	ID_STAGE id_stage(
+	id_part id_part(
 		.clk          (clk),
 		.instr        (instr_id),
 		.writereg     (writereg_wb),
 		.result       (result_wb),
 		.pc_plus4     (pc_plus4_id),
-		.readreg_1    (rd_1_id),
-		.readreg_2    (rd_2_id),
+		.readreg_1    (readreg_1_id),
+		.readreg_2    (readreg_2_id),
 		.signimm      (signimm_id),
 		.rs			  (rs_id),
 		.rt			  (rt_id),
 		.rd			  (rd_id),
 		.shiftl16     (shiftl16_id),
-		.regdst       (regdst_id),
-		.alusrc       (alusrc_id),
+		.regdst       (regdst_id),  
+		.alusrc       (alusrc_id),  
 		.branch       (branch_id),
-		.branch_bne     (branch_bne_id),
+		.branchN     (branchN_id),
 		.jump         (jump_id),
 		.memwrite     (memwrite_id),
-		.isjal     (isjal_id),
-		.memtoreg     (memtoreg_id),
-		.regwrite (regwrite_id),
+		.isjal     (isjal_id), 
+		.memtoreg     (memtoreg_id), 
+		.regwrite (regwrite_id), 
 		.alucontrol   (alucontrol_id),
 		.regwrite_wb  (regwrite_wb)
 		);
 		
-	brc_or_jump bj(
+	flowcheck flowcheck(
 		.alucontrol	  (alucontrol_ex),
 		.branch		  (branch_ex),
-		.branch_bne      (branch_bne_ex),
+		.branchN      (branchN_ex),
 		.jump         (jump_ex),
 		.aluzero			  (aluzero_ex),
 		.flush		  (flush_pc_move)
 		);
-
-   ID_EX id_ex(
+		
+   ppline_idex ff_idex(
 		.clk          (clk),
-		.reset        (flush_id_ex_or_reset),
-		.pc_plus4_in    (pc_plus4_id),
-		.rd1_in        (rd_1_id),
-		.rd2_in        (rd_2_id),
-		.immex_in      (signimm_id),
-		.instr_in      (instr_id),
-		.rs_in			  (rs_id),
-		.rt_in			  (rt_id),
-		.rd_in			  (rd_id),
-		.shiftl16_in   (shiftl16_id),
-		.regdst_in     (regdst_id),
-		.alucontrol_in      (alucontrol_id),
-		.alusrc_in     (alusrc_id),
-		.branch_in		  (branch_id),
-		.branch_bne_in		  (branch_bne_id),
-		.jump_in			  (jump_id),
-		.memwrite_in   (memwrite_id),
-		.isjal_in   (isjal_id),
-		.memtoreg_in   (memtoreg_id),
-		.regwrite_in   (regwrite_id),
+		.reset        (flush_idex_or_reset),
+		.pc_plus4_d    (pc_plus4_id),
+		.rd1_d        (readreg_1_id),
+		.rd2_d        (readreg_2_id),
+		.immex_d      (signimm_id),
+		.instr_d      (instr_id),
+		.rs_d			  (rs_id),
+		.rt_d			  (rt_id),
+		.rd_d			  (rd_id),
+		.shiftl16_d   (shiftl16_id),
+		.regdst_d     (regdst_id),  
+		.alucontrol_d      (alucontrol_id),   
+		.alusrc_d     (alusrc_id),  
+		.branch_d		  (branch_id),
+		.branchN_d		  (branchN_id),
+		.jump_d			  (jump_id),
+		.memwrite_d   (memwrite_id),
+		.isjal_d   (isjal_id), 
+		.memtoreg_d   (memtoreg_id), 
+		.regwrite_d   (regwrite_id), 
 		.pc_plus4      (pc_plus4_ex),
 		.rd1          (readreg_1_ex),
 		.rd2          (readreg_2_ex),
@@ -146,18 +146,18 @@ module mips(input         clk, reset,
 		.rt			  (rt_ex),
 		.rd			  (rd_ex),
 		.shiftl16     (shiftl16_ex),
-		.regdst       (regdst_ex),
-		.alucontrol   (alucontrol_ex),
-		.alusrc       (alusrc_ex),
+		.regdst       (regdst_ex),  
+		.alucontrol   (alucontrol_ex),   
+		.alusrc       (alusrc_ex),  
 		.branch		  (branch_ex),
-		.branch_bne		  (branch_bne_ex),
+		.branchN		  (branchN_ex),
 		.jump			  (jump_ex),
 		.memwrite     (memwrite_ex),
-		.isjal     (isjal_ex),
-		.regwrite     (regwrite_ex),
-		.memtoreg     (memtoreg_ex));
+		.isjal     (isjal_ex), 
+		.regwrite     (regwrite_ex), 
+		.memtoreg     (memtoreg_ex)); 
 		
-	EX_STAGE ex_stage(
+	ex_part ex_part(
 		.instr			(instr_ex),
 		.readreg_1     (readreg_1_ex),
 		.readreg_2     (readreg_2_ex),
@@ -171,64 +171,63 @@ module mips(input         clk, reset,
 		.rt  			   (rt_ex),
 		.rd  			   (rd_ex),
 		.shiftl16      (shiftl16_ex),
-		.regdst        (regdst_ex),
-		.alucontrol    (alucontrol_ex),
-		.alusrc        (alusrc_ex),
-		.branch			(branch_ex),
-		.branch_bne			(branch_bne_ex),
+		.regdst        (regdst_ex),  
+		.alucontrol    (alucontrol_ex),   
+		.alusrc        (alusrc_ex),  
+		.branch			(branch_ex), 
+		.branchN			(branchN_ex),
 		.jump				(jump_ex),
-		.isjal      (isjal_ex),
+		.isjal      (isjal_ex), 
 		.aluzero       (aluzero_ex),
 		.aluout        (aluout_ex),
 		.pc_next			(pc_next),
 		.writereg      (writereg_ex),
-		.write_inata		(write_inata_ex)
+		.write_data		(write_data_ex)
 		);
 	
-	
-	EX_MEM ex_mem(
+	ppline_exmem ff_exmem(
 		.clk            (clk),
 		.reset          (reset),
-		.pc_plus4_in   	(pc_plus4_ex),
-		.aluout_in       (aluout_ex),
-		.write_inata_in          (write_inata_ex),
-		.writereg_in (writereg_ex),
-		.memwrite_in     (memwrite_ex),
-		.isjal_in  (isjal_ex),
-		.regwrite_in     (regwrite_ex),
-		.memtoreg_in     (memtoreg_ex),
+		.pc_plus4_d   	(pc_plus4_ex),
+		.aluzero_d      (aluzero_ex),
+		.aluout_d       (aluout_ex),
+		.write_data_d          (write_data_ex),
+		.writereg_d (writereg_ex),
+		.memwrite_d     (memwrite_ex),
+		.isjal_d  (isjal_ex),  
+		.regwrite_d     (regwrite_ex), 
+		.memtoreg_d     (memtoreg_ex),  
 		.pc_plus4        (pc_plus4_mem),
+		.aluzero        (aluzero_mem),
 		.aluout         (aluout_mem),
-		.write_inata            (write_inata_mem),
+		.write_data            (write_data_mem),
 		.writereg   (writereg_mem),   
 		.memwrite       (memwrite_mem),
-		.isjal    (isjal_mem),
-		.regwrite       (regwrite_mem),
-		.memtoreg       (memtoreg_mem)
+		.isjal    (isjal_mem),  
+		.regwrite       (regwrite_mem),  
+		.memtoreg       (memtoreg_mem)   
 		);		
 		
-	//-- MEM/WB Flipflop --//
-	MEM_WB mem_wb(
+	ppline_memwb ff_memwb(
 		.clk            (clk),
 		.reset          (reset),
-		.pc_plus4_in      (pc_plus4_mem),
-		.readdata_in     (memread_mem),
-		.aluout_in       (aluout_mem),
-		.writereg_in     (writereg_mem),
-		.isjal_in  (isjal_mem),
-		.regwrite_in     (regwrite_mem),
-		.memtoreg_in     (memtoreg_mem),
+		.pc_plus4_d      (pc_plus4_mem),
+		.readdata_d     (memread_mem),
+		.aluout_d       (aluout_mem),
+		.writereg_d     (writereg_mem),
+		.isjal_d  (isjal_mem),  
+		.regwrite_d     (regwrite_mem),  
+		.memtoreg_d     (memtoreg_mem),  
 		.pc_plus4        (pc_plus4_wb),
 		.readdata       (memread_wb),
 		.aluout         (aluout_wb),
 		.writereg       (writereg_wb),
-		.isjal       (isjal_wb),
+		.isjal       (isjal_wb),  
 		.regwrite       (regwrite_wb),
-		.memtoreg       (memtoreg_wb)
+		.memtoreg       (memtoreg_wb)  
 		);
 		
-		
-	WB_STAGE wb_stage(
+	wb_part wb_part(
 		.pc_plus4   (pc_plus4_wb),
 		.aluout    (aluout_wb),
 		.readdata  (memread_wb),
@@ -236,7 +235,7 @@ module mips(input         clk, reset,
 		.memtoreg  (memtoreg_wb),
 		.result    (result_wb));
 		
-	forwarding_unit fu(
+	forwarding forwarding(
 		.regwrite_wb	(regwrite_wb),
 		.regwrite_mem	(regwrite_mem),
 		.rs				(rs_ex),
@@ -247,22 +246,23 @@ module mips(input         clk, reset,
 		.foward_rt		(foward_rt));
 		
 	
-	hazard_inetect_unit hzu(
+	hazard_detect_unit hdu(
 		.op_ex			(instr_ex[31:26]),
 		.load_reg		(rt_ex),
 		.rs_id			(rs_id),
 		.rt_id			(rt_id),
 		.keep_write_pc		(keep_write_pc),
 		.keep_write_ifid	(keep_write_ifid),
-		.flush_id_ex		(flush_id_ex));
+		.flush_idex		(flush_idex));
 
 endmodule
+
 
 module maindec(input  [5:0] op,
                output       signext,
                output       shiftl16,
                output       memtoreg, memwrite,
-               output       branch, alusrc, branch_bne,
+               output       branch, alusrc, branchN,
                output       regdst, regwrite,
                output       jump, isjal,
                output [2:0] aluop);
@@ -270,7 +270,7 @@ module maindec(input  [5:0] op,
   reg [13:0] controls;
 
   assign {signext, shiftl16, regwrite, regdst, alusrc, branch, memwrite,
-          memtoreg, jump, aluop, branch_bne, isjal} = controls;
+          memtoreg, jump, aluop, branchN, isjal} = controls;
 
   always @(*)
     case(op)
@@ -314,19 +314,19 @@ module aludec(input      [5:0] funct,
           6'b100101: alucontrol <= #`mydelay 4'b0001; // OR
           6'b101010: alucontrol <= #`mydelay 4'b0111; // SLT
 			 6'b101011: alucontrol <= #`mydelay 4'b1111; // SLTU
-          default:   alucontrol <= #`mydelay 4'b0000; // ???
+          default:   alucontrol <= #`mydelay 4'b0000;
         endcase
     endcase	 
 	 if (aluop == 3'b011 && funct == 6'b001000) begin
-	     disregwrite <= #`mydelay 1'b0;     // if JR do not write reg
+	     disregwrite <= #`mydelay 1'b0;
 	 end
 	 else begin
-	     disregwrite <= #`mydelay 1'b1;     // else write reg
+	     disregwrite <= #`mydelay 1'b1;
 	 end
   end    
 endmodule
 
-module IF_STAGE(input			clk, reset,
+module if_part(input			clk, reset,
 					input			  keep_write,
 					input	 [31:0] pc_next,
 					output [31:0] pc,
@@ -346,11 +346,11 @@ module IF_STAGE(input			clk, reset,
 
 endmodule
 
-module ID_STAGE(input			clk,
+module id_part(input			clk,
 					input	[31:0]  instr,
-					input [4:0]	  writereg,
-					input [31:0]  result,
-					input [31:0]  pc_plus4,
+					input   [4:0]   writereg,
+					input   [31:0]  result,
+					input   [31:0]  pc_plus4,
 					input         regwrite_wb,
 					output [31:0] readreg_1,
 					output [31:0] readreg_2,
@@ -359,10 +359,10 @@ module ID_STAGE(input			clk,
 					output [4:0]  rd,
 					output [4:0]  rt,
 					output		  shiftl16,
-					output		  regdst,
+					output		  regdst,   
 					output		  alusrc,
 					output        branch,
-					output        branch_bne,
+					output        branchN,
 					output        jump,
 					output        memwrite,
 					output        isjal,
@@ -416,7 +416,7 @@ module ID_STAGE(input			clk,
 		.memtoreg (memtoreg),
 		.memwrite (memwrite),
 		.branch   (branch),
-		.branch_bne  (branch_bne),
+		.branchN  (branchN),
 		.alusrc   (alusrc),
 		.regdst   (regdst),
 		.regwrite (regwrite_mid),
@@ -434,7 +434,8 @@ module ID_STAGE(input			clk,
 
 endmodule
 
-module EX_STAGE(input	[31:0]  instr,
+
+module ex_part(input	[31:0]  instr,
 					input [31:0]  readreg_1,
 					input [31:0]  readreg_2,
 					input [31:0]  foward_mem,
@@ -451,14 +452,14 @@ module EX_STAGE(input	[31:0]  instr,
 					input [3:0]   alucontrol,
 					input         alusrc,
 					input         branch,
-					input         branch_bne,
+					input         branchN,
 					input         jump,
 					input         isjal,
 					output        aluzero,
 					output [31:0] aluout,
 					output [31:0] pc_next,
 					output [4:0]  writereg,
-					output [31:0] write_inata
+					output [31:0] write_data
 					);
 					
 	  wire [31:0] signimmsh2, signimmsh16;
@@ -468,7 +469,7 @@ module EX_STAGE(input	[31:0]  instr,
 	  wire [4:0]  writereg_mid;
 	  wire        pcsrc;
 	  
-	  assign write_inata = aluin2_mid;
+	  assign write_data = aluin2_mid;
 	  
 	  shift_left_16 sl16(
 		.a         (signimm[31:0]),
@@ -483,7 +484,7 @@ module EX_STAGE(input	[31:0]  instr,
 		.s	 (foward_rs),
 		.y  (aluin1));
 		
-		mux4 #(32) is_foward_rt(
+	  mux4 #(32) is_foward_rt(
 		.d0 (readreg_2),
 		.d1 (foward_mem),
 		.d2 (foward_wd),
@@ -510,7 +511,7 @@ module EX_STAGE(input	[31:0]  instr,
 		.s   (regdst),
 		.y   (writereg_mid));
 		
-	assign pcsrc = branch_bne ? (branch & !aluzero) : (branch & aluzero);
+	assign pcsrc = branchN ? (branch & !aluzero) : (branch & aluzero);
 	
 	sl2 immshift(
 		.a (signimm),
@@ -527,7 +528,7 @@ module EX_STAGE(input	[31:0]  instr,
 		.s   (pcsrc),
 		.y   (pc_next_mid));
 		
-	jrmux is_jr_mux(
+	jrmux jrpcmux(
 		.d0       (pc_next_mid),
 		.d1       (aluin1),
 		.alucontrol (alucontrol),
@@ -539,7 +540,7 @@ module EX_STAGE(input	[31:0]  instr,
 		.s    (jump),
 		.y    (pc_next));
 		
-	  mux2 #(5) jalreg_reg_mux(
+	mux2 #(5) wrdst_jal_mux(
 		.d0  (writereg_mid),
 		.d1  (5'b11111),
 		.s   (isjal),
@@ -547,23 +548,23 @@ module EX_STAGE(input	[31:0]  instr,
 	  
 endmodule
 
-module WB_STAGE(input  [31:0] pc_plus4,
+module wb_part(input  [31:0] pc_plus4,
 					input  [31:0] aluout,
 					input  [31:0] readdata,
 					input         isjal,
 					input         memtoreg,
 					output [31:0] result);
 					
-    wire [31:0] tmp;
+    wire [31:0] result_mid;
 	 
 	 mux2 #(32) resmux(
 		.d0 (aluout),
 		.d1 (readdata),
 		.s  (memtoreg),
-		.y  (tmp));
+		.y  (result_mid));
 		
     mux2 #(32) jalresmux(
-		.d0 (tmp),
+		.d0 (result_mid),
 		.d1 (pc_plus4),
 		.s  (isjal),
 		.y  (result));
