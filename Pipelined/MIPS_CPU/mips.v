@@ -57,30 +57,29 @@ module mips(input         clk, reset,
    assign memwritedata = write_data_mem;
 	
 	wire flush_idex_or_reset;
-	wire flush_idex;
-	wire keep_write_pc, keep_write_ifid;
-	assign flush_idex_or_reset = flush_pc_move | flush_idex | reset;
+	wire keep_write;
+	assign flush_idex_or_reset = flush_pc_move | !keep_write | reset;
 	
 	assign flush_ifid = flush_pc_move | reset;
   
-	if_part if_part(
+	IF_STAGE if_stage(
 		.clk        (clk),
 		.reset      (reset),
-		.keep_write     (keep_write_pc),
+		.keep_write     (keep_write),
 		.pc_next     (pc_next),
 		.pc         (pc),
 		.pc_plus4    (pc_plus4_if));
 		
-	ppline_ifid ff_ifid(
+	IF_ID if_id(
 		.clk       (clk),
 		.reset     (flush_ifid),
-		.keep_write    (keep_write_ifid),
-		.pc_plus4_d (pc_plus4_if),
-		.instr_d   (instr_if),
+		.keep_write    (keep_write),
+		.pc_plus4_in (pc_plus4_if),
+		.instr_in   (instr_if),
 		.pc_plus4   (pc_plus4_id),
 		.instr     (instr_id));
 		
-	id_part id_part(
+	ID_STAGE id_stage(
 		.clk          (clk),
 		.instr        (instr_id),
 		.writereg     (writereg_wb),
@@ -106,7 +105,7 @@ module mips(input         clk, reset,
 		.regwrite_wb  (regwrite_wb)
 		);
 		
-	flowcheck flowcheck(
+	control_hazard_unit chu(
 		.alucontrol	  (alucontrol_ex),
 		.branch		  (branch_ex),
 		.branchN      (branchN_ex),
@@ -115,28 +114,28 @@ module mips(input         clk, reset,
 		.flush		  (flush_pc_move)
 		);
 		
-   ppline_idex ff_idex(
+   ID_EX id_ex(
 		.clk          (clk),
 		.reset        (flush_idex_or_reset),
-		.pc_plus4_d    (pc_plus4_id),
-		.rd1_d        (readreg_1_id),
-		.rd2_d        (readreg_2_id),
-		.immex_d      (signimm_id),
-		.instr_d      (instr_id),
-		.rs_d			  (rs_id),
-		.rt_d			  (rt_id),
-		.rd_d			  (rd_id),
-		.shiftl16_d   (shiftl16_id),
-		.regdst_d     (regdst_id),  
-		.alucontrol_d      (alucontrol_id),   
-		.alusrc_d     (alusrc_id),  
-		.branch_d		  (branch_id),
-		.branchN_d		  (branchN_id),
-		.jump_d			  (jump_id),
-		.memwrite_d   (memwrite_id),
-		.isjal_d   (isjal_id), 
-		.memtoreg_d   (memtoreg_id), 
-		.regwrite_d   (regwrite_id), 
+		.pc_plus4_in    (pc_plus4_id),
+		.rd1_in        (readreg_1_id),
+		.rd2_in        (readreg_2_id),
+		.immex_in      (signimm_id),
+		.instr_in      (instr_id),
+		.rs_in			  (rs_id),
+		.rt_in			  (rt_id),
+		.rd_in			  (rd_id),
+		.shiftl16_in   (shiftl16_id),
+		.regdst_in     (regdst_id),  
+		.alucontrol_in      (alucontrol_id),   
+		.alusrc_in     (alusrc_id),  
+		.branch_in		  (branch_id),
+		.branchN_in		  (branchN_id),
+		.jump_in			  (jump_id),
+		.memwrite_in   (memwrite_id),
+		.isjal_in   (isjal_id), 
+		.memtoreg_in   (memtoreg_id), 
+		.regwrite_in   (regwrite_id), 
 		.pc_plus4      (pc_plus4_ex),
 		.rd1          (readreg_1_ex),
 		.rd2          (readreg_2_ex),
@@ -157,7 +156,7 @@ module mips(input         clk, reset,
 		.regwrite     (regwrite_ex), 
 		.memtoreg     (memtoreg_ex)); 
 		
-	ex_part ex_part(
+	EX_STAGE ex_stage(
 		.instr			(instr_ex),
 		.readreg_1     (readreg_1_ex),
 		.readreg_2     (readreg_2_ex),
@@ -185,18 +184,18 @@ module mips(input         clk, reset,
 		.write_data		(write_data_ex)
 		);
 	
-	ppline_exmem ff_exmem(
+	EX_MEM ex_mem(
 		.clk            (clk),
 		.reset          (reset),
-		.pc_plus4_d   	(pc_plus4_ex),
-		.aluzero_d      (aluzero_ex),
-		.aluout_d       (aluout_ex),
-		.write_data_d          (write_data_ex),
-		.writereg_d (writereg_ex),
-		.memwrite_d     (memwrite_ex),
-		.isjal_d  (isjal_ex),  
-		.regwrite_d     (regwrite_ex), 
-		.memtoreg_d     (memtoreg_ex),  
+		.pc_plus4_in   	(pc_plus4_ex),
+		.aluzero_in      (aluzero_ex),
+		.aluout_in       (aluout_ex),
+		.write_data_in          (write_data_ex),
+		.writereg_in (writereg_ex),
+		.memwrite_in     (memwrite_ex),
+		.isjal_in  (isjal_ex),  
+		.regwrite_in     (regwrite_ex), 
+		.memtoreg_in     (memtoreg_ex),  
 		.pc_plus4        (pc_plus4_mem),
 		.aluzero        (aluzero_mem),
 		.aluout         (aluout_mem),
@@ -208,16 +207,16 @@ module mips(input         clk, reset,
 		.memtoreg       (memtoreg_mem)   
 		);		
 		
-	ppline_memwb ff_memwb(
+	MEM_WB mem_wb(
 		.clk            (clk),
 		.reset          (reset),
-		.pc_plus4_d      (pc_plus4_mem),
-		.readdata_d     (memread_mem),
-		.aluout_d       (aluout_mem),
-		.writereg_d     (writereg_mem),
-		.isjal_d  (isjal_mem),  
-		.regwrite_d     (regwrite_mem),  
-		.memtoreg_d     (memtoreg_mem),  
+		.pc_plus4_in      (pc_plus4_mem),
+		.readdata_in     (memread_mem),
+		.aluout_in       (aluout_mem),
+		.writereg_in     (writereg_mem),
+		.isjal_in  (isjal_mem),  
+		.regwrite_in     (regwrite_mem),  
+		.memtoreg_in     (memtoreg_mem),  
 		.pc_plus4        (pc_plus4_wb),
 		.readdata       (memread_wb),
 		.aluout         (aluout_wb),
@@ -227,7 +226,7 @@ module mips(input         clk, reset,
 		.memtoreg       (memtoreg_wb)  
 		);
 		
-	wb_part wb_part(
+	WB_STAGE wb_stage(
 		.pc_plus4   (pc_plus4_wb),
 		.aluout    (aluout_wb),
 		.readdata  (memread_wb),
@@ -235,7 +234,7 @@ module mips(input         clk, reset,
 		.memtoreg  (memtoreg_wb),
 		.result    (result_wb));
 		
-	forwarding forwarding(
+	forwarding_unit fu(
 		.regwrite_wb	(regwrite_wb),
 		.regwrite_mem	(regwrite_mem),
 		.rs				(rs_ex),
@@ -251,9 +250,7 @@ module mips(input         clk, reset,
 		.load_reg		(rt_ex),
 		.rs_id			(rs_id),
 		.rt_id			(rt_id),
-		.keep_write_pc		(keep_write_pc),
-		.keep_write_ifid	(keep_write_ifid),
-		.flush_idex		(flush_idex));
+		.keep_write		(keep_write));
 
 endmodule
 
@@ -326,7 +323,7 @@ module aludec(input      [5:0] funct,
   end    
 endmodule
 
-module if_part(input			clk, reset,
+module IF_STAGE(input			clk, reset,
 					input			  keep_write,
 					input	 [31:0] pc_next,
 					output [31:0] pc,
@@ -346,7 +343,7 @@ module if_part(input			clk, reset,
 
 endmodule
 
-module id_part(input			clk,
+module ID_STAGE(input			clk,
 					input	[31:0]  instr,
 					input   [4:0]   writereg,
 					input   [31:0]  result,
@@ -435,7 +432,7 @@ module id_part(input			clk,
 endmodule
 
 
-module ex_part(input	[31:0]  instr,
+module EX_STAGE(input	[31:0]  instr,
 					input [31:0]  readreg_1,
 					input [31:0]  readreg_2,
 					input [31:0]  foward_mem,
@@ -548,7 +545,7 @@ module ex_part(input	[31:0]  instr,
 	  
 endmodule
 
-module wb_part(input  [31:0] pc_plus4,
+module WB_STAGE(input  [31:0] pc_plus4,
 					input  [31:0] aluout,
 					input  [31:0] readdata,
 					input         isjal,
