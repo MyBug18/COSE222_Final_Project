@@ -783,6 +783,25 @@ module alu(input      [31:0] a, b,
 
 endmodule
 
+module control_hazard_detection(input [31:0] instr, pc_plus4,
+								input [31:0] rd1, rd2,
+								input branch, branch_bne, j, jr,
+								output reg [31:0] result_pc,
+								output reg is_changing_pc);
+	always @(*)
+		begin
+			if (jr == 1'b0) result_pc <= rd1;
+			else if (j == 1'b0) result_pc <= {pc_plus4[31:28], instr[25:0], 2'b00};
+			else if ((branch == 1'b0) | (branch_bne == 1'b0)) result_pc <= pc_plus4 + ({16'b0, instr[15:0]} << 2);
+			else result_pc <= pc_plus4;
+
+			if ((jr == 1'b0) | (j == 1'b0)) is_changing_pc <= 1'b1;
+			else if (branch_bne == 1'b0) is_changing_pc <= (rd1 != rd2);
+			else if (branch == 1'b0) is_changing_pc <= (rd1 == rd2);
+			else is_changing_pc <= 1'b0;
+		end	
+endmodule
+
 module adder_32bit (input  [31:0] a, b, 
                     input         cin,
                     output [31:0] sum,

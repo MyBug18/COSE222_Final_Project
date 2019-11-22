@@ -58,7 +58,7 @@ module mips(input         clk, reset,
 	
 	wire nullify_idex_or_reset;
 	wire keep_write;
-	assign nullify_idex_or_reset = nullify_pc_move | !keep_write | reset;
+	assign nullify_idex_or_reset = nullify_pc_move | reset;
 	
 	assign nullify_ifid = nullify_pc_move | reset;
   
