@@ -16,6 +16,8 @@ module mips(input         clk, reset,
             output [31:0] memwritedata,
             input  [31:0] memreaddata);
   
+// ###### Minsoo Kim: Start ######
+
   wire [3:0]  alucontrol_id, alucontrol_ex;
   
 
@@ -34,7 +36,7 @@ module mips(input         clk, reset,
    wire [31:0] memread_mem, memread_wb;
    wire [31:0] result_wb;
    wire aluzero_ex;
-   wire nullify_pc_move, nullify_ifid;
+   wire nullify_pc_move, nullify_pipe;
 	
    wire [1:0] foward_rs, foward_rt;
   
@@ -56,11 +58,11 @@ module mips(input         clk, reset,
    assign memaddr = aluout_mem;
    assign memwritedata = write_data_mem;
 	
-	wire nullify_idex_or_reset;
+//	wire nullify_idex_or_reset;
 	wire keep_write;
-	assign nullify_idex_or_reset = nullify_pc_move | reset;
+//	assign nullify_idex_or_reset = nullify_pc_move | reset;
 	
-	assign nullify_ifid = nullify_pc_move | reset;
+	assign nullify_pipe = nullify_pc_move | reset;
   
 	IF_STAGE if_stage(
 		.clk        (clk),
@@ -72,7 +74,7 @@ module mips(input         clk, reset,
 		
 	IF_ID if_id(
 		.clk       (clk),
-		.reset     (nullify_ifid),
+		.reset     (nullify_pipe),
 		.keep_write    (keep_write),
 		.pc_plus4_in (pc_plus4_if),
 		.instr_in   (instr_if),
@@ -116,7 +118,7 @@ module mips(input         clk, reset,
 		
    ID_EX id_ex(
 		.clk          (clk),
-		.reset        (nullify_idex_or_reset),
+		.reset        (nullify_pipe),
 		.pc_plus4_in    (pc_plus4_id),
 		.rd1_in        (rd1_id),
 		.rd2_in        (rd2_id),
@@ -252,3 +254,5 @@ module mips(input         clk, reset,
 		.keep_write		(keep_write));
 
 endmodule
+
+// ###### Minsoo Kim: End ######
