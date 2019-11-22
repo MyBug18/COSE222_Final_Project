@@ -48,7 +48,7 @@ module regfile(input             clk,
 	reg [31:0] R30;
 	reg [31:0] R31;
 
-	always @(posedge clk)
+	always @(negedge clk)
 	begin
   	 if (we) 
    		case (wa[4:0])
@@ -87,7 +87,7 @@ module regfile(input             clk,
    		endcase
 	end
 
-	always @(negedge clk)
+	always @(*)
 	begin
 		case (ra2[4:0])
 		5'd0:   rd2 = 32'b0;
@@ -125,7 +125,7 @@ module regfile(input             clk,
 		endcase
 	end
 
-	always @(negedge clk)
+	always @(*)
 	begin
 		case (ra1[4:0])
 		5'd0:   rd1 = 32'b0;
@@ -175,9 +175,9 @@ module regfile(input         clk,
 
   reg [31:0] rf[31:0];
 
-  always @(posedge clk)
-    if (we) rf[wa] <= #`mydelay wd;	
   always @(negedge clk)
+    if (we) rf[wa] <= #`mydelay wd;	
+  always @(*)
 	begin
 	  	rd1 <= #`mydelay (ra1 != 0) ? rf[ra1] : 0;
  	 	rd2 <= #`mydelay (ra2 != 0) ? rf[ra2] : 0;
@@ -310,8 +310,8 @@ module ID_STAGE(input			clk,
 					input   [31:0]  result,
 					input   [31:0]  pc_plus4,
 					input         regwrite_wb,
-					output [31:0] reg_read_1,
-					output [31:0] reg_read_2,
+					output [31:0] rd1,
+					output [31:0] rd2,
 					output [31:0] signimm,
 					output [4:0]  rs,
 					output [4:0]  rd,
@@ -331,7 +331,6 @@ module ID_STAGE(input			clk,
     wire 		 signext;
 	 wire        regwrite_tmp;
 	 wire        jr_no_regwrite;
-	 wire [31:0] reg_read_1_tmp, reg_read_2_tmp;
 	 wire [2:0]	 aluop;
 	 
 	 assign rs = instr[25:21];
@@ -345,18 +344,8 @@ module ID_STAGE(input			clk,
 		.ra2     (rt),
 		.wa      (writereg),
 		.wd      (result),
-		.rd1     (reg_read_1_tmp),
-		.rd2     (reg_read_2_tmp));
-
-	forwarding_in_ID fwd_ID(
-		.writereg      (writereg),
-		.reg_read_1    (rs),
-		.reg_read_2    (rt),
-		.to_be_writed  (result),
-		.rd1           (reg_read_1_tmp),
-		.rd2           (reg_read_2_tmp),
-		.forwarded_rd1 (reg_read_1),
-		.forwarded_rd2 (reg_read_2));
+		.rd1     (rd1),
+		.rd2     (rd2));
 		
     sign_zero_ext sze(
 		.a       (instr[15:0]),
@@ -401,9 +390,9 @@ module ID_EX(input 	         clk, reset,
 				   input             regdst_in,  
 				   input      [3:0]  alucontrol_in,   
 				   input             alusrc_in,    
-					input					branch_in,	
-					input					branch_bne_in,	
-					input					jump_in,	
+					input			branch_in,	
+					input			branch_bne_in,	
+					input			jump_in,	
 				   input             memwrite_in,  
 				   input             isjal_in,
 				   input             regwrite_in,
@@ -476,8 +465,8 @@ module ID_EX(input 	         clk, reset,
 endmodule
 
 module EX_STAGE(input	[31:0]  instr,
-					input [31:0]  reg_read_1,
-					input [31:0]  reg_read_2,
+					input [31:0]  rd1,
+					input [31:0]  rd2,
 					input [31:0]  foward_mem,
 					input [31:0]  foward_wd,
 					input [1:0]	  foward_rs,
@@ -517,7 +506,7 @@ module EX_STAGE(input	[31:0]  instr,
 		.y         (signimmsh16[31:0]));
 		
 	  mux4 #(32) foward_for_rs(
-		.d0 (reg_read_1),
+		.d0 (rd1),
 		.d1 (foward_mem),
 		.d2 (foward_wd),
 		.d3 (32'b0),
@@ -525,7 +514,7 @@ module EX_STAGE(input	[31:0]  instr,
 		.y  (alu_a));
 		
 	  mux4 #(32) foward_for_rt(
-		.d0 (reg_read_2),
+		.d0 (rd2),
 		.d1 (foward_mem),
 		.d2 (foward_wd),
 		.d3 (32'b0),
@@ -755,16 +744,6 @@ module hazard_detect_unit(input [5:0]	op_ex,
 		if ((op_ex == 6'b100011) && ((load_reg == rs_id) || (load_reg == rt_id))) keep_write = 1'b0;
 		else keep_write = 1'b1;
 	
-endmodule
-
-module forwarding_in_ID(input [4:0] writereg, 
-							  input [4:0] reg_read_1, reg_read_2,
-							  input [31:0] to_be_writed,
-							  input [31:0] rd1, rd2,
-							  output [31:0] forwarded_rd1, forwarded_rd2);
-	assign forwarded_rd1 = (writereg == reg_read_1) ? to_be_writed : rd1;
-	assign forwarded_rd2 = (writereg == reg_read_2) ? to_be_writed : rd2;
-
 endmodule
 
 module alu(input      [31:0] a, b, 

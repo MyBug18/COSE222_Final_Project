@@ -27,8 +27,8 @@ module mips(input         clk, reset,
    wire [4:0] writereg_ex, writereg_mem, writereg_wb;
    wire [31:0] write_data_ex, write_data_mem;
    wire [31:0] pc_next;
-   wire [31:0] reg_read_1_id, reg_read_1_ex;
-   wire [31:0] reg_read_2_id, reg_read_2_ex;
+   wire [31:0] rd1_id, rd1_ex;
+   wire [31:0] rd2_id, rd2_ex;
    wire [31:0] signimm_id, signimm_ex;
    wire [31:0] aluout_ex, aluout_mem, aluout_wb;
    wire [31:0] memread_mem, memread_wb;
@@ -85,8 +85,8 @@ module mips(input         clk, reset,
 		.writereg     (writereg_wb),
 		.result       (result_wb),
 		.pc_plus4     (pc_plus4_id),
-		.reg_read_1    (reg_read_1_id),
-		.reg_read_2    (reg_read_2_id),
+		.rd1    (rd1_id),
+		.rd2    (rd2_id),
 		.signimm      (signimm_id),
 		.rs			  (rs_id),
 		.rt			  (rt_id),
@@ -118,8 +118,8 @@ module mips(input         clk, reset,
 		.clk          (clk),
 		.reset        (nullify_idex_or_reset),
 		.pc_plus4_in    (pc_plus4_id),
-		.rd1_in        (reg_read_1_id),
-		.rd2_in        (reg_read_2_id),
+		.rd1_in        (rd1_id),
+		.rd2_in        (rd2_id),
 		.immex_in      (signimm_id),
 		.instr_in      (instr_id),
 		.rs_in			  (rs_id),
@@ -137,8 +137,8 @@ module mips(input         clk, reset,
 		.memtoreg_in   (memtoreg_id), 
 		.regwrite_in   (regwrite_id), 
 		.pc_plus4      (pc_plus4_ex),
-		.rd1          (reg_read_1_ex),
-		.rd2          (reg_read_2_ex),
+		.rd1          (rd1_ex),
+		.rd2          (rd2_ex),
 		.immex        (signimm_ex),
 		.instr        (instr_ex),
 		.rs			  (rs_ex),
@@ -158,8 +158,8 @@ module mips(input         clk, reset,
 		
 	EX_STAGE ex_stage(
 		.instr			(instr_ex),
-		.reg_read_1     (reg_read_1_ex),
-		.reg_read_2     (reg_read_2_ex),
+		.rd1     (rd1_ex),
+		.rd2     (rd2_ex),
 		.foward_mem 	(aluout_mem),
 		.foward_wd     (result_wb),
 		.foward_rs     (foward_rs),
