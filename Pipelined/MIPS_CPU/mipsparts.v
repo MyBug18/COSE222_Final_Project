@@ -51,7 +51,6 @@ module regfile(input             clk,
 	always @(posedge clk)
 	begin
   	 if (we) 
-	 begin
    		case (wa[4:0])
    		5'd0:   ;
    		5'd1:   R1  <= wd;
@@ -86,10 +85,9 @@ module regfile(input             clk,
    		5'd30:  R30 <= wd;
    		5'd31:  R31 <= wd;
    		endcase
-     end
 	end
 
-	always @(*)
+	always @(negedge clk)
 	begin
 		case (ra2[4:0])
 		5'd0:   rd2 = 32'b0;
@@ -127,7 +125,7 @@ module regfile(input             clk,
 		endcase
 	end
 
-	always @(*)
+	always @(negedge clk)
 	begin
 		case (ra1[4:0])
 		5'd0:   rd1 = 32'b0;
@@ -179,12 +177,113 @@ module regfile(input         clk,
 
   always @(posedge clk)
     if (we) rf[wa] <= #`mydelay wd;	
-
-  assign #`mydelay rd1 = (ra1 != 0) ? rf[ra1] : 0;
-  assign #`mydelay rd2 = (ra2 != 0) ? rf[ra2] : 0;
+  always @(negedge clk)
+	begin
+	  	rd1 <= #`mydelay (ra1 != 0) ? rf[ra1] : 0;
+ 	 	rd2 <= #`mydelay (ra2 != 0) ? rf[ra2] : 0;
+	end
 endmodule
 
 `endif
+
+module is_equal(input  [31:0] d0, d1,
+              output  reg eq);
+
+  always @(*)
+	begin
+	   if (d0 == d1)  eq <= 1'b1;
+	   else          eq <= 1'b0;
+	end
+
+endmodule
+
+module maindec(input  [5:0] op,
+               output       signext,
+               output       shiftl16,
+               output       memtoreg, memwrite,
+               output       branch, alusrc, branch_bne,
+               output       regdst, regwrite,
+               output       jump, isjal,
+               output [2:0] aluop);
+
+  reg [13:0] controls;
+
+  assign {signext, shiftl16, regwrite, regdst, alusrc, branch, memwrite,
+          memtoreg, jump, aluop, branch_bne, isjal} = controls;
+
+  always @(*)
+    case(op)
+      6'b000000: controls <= #`mydelay 14'b00110000001100; // Rtype
+      6'b100011: controls <= #`mydelay 14'b10101001000000; // LW
+      6'b101011: controls <= #`mydelay 14'b10001010000000; // SW
+      6'b000100: controls <= #`mydelay 14'b10000100000100; // BEQ
+      6'b001000, 
+      6'b001001: controls <= #`mydelay 14'b10101000000000; // ADDI, ADDIU: only difference is exception
+      6'b001101: controls <= #`mydelay 14'b00101000001000; // ORI
+		6'b001010: controls <= #`mydelay 14'b10101000011000; // SLTI
+		6'b001011: controls <= #`mydelay 14'b10101000011100; // SLTIU
+      6'b001111: controls <= #`mydelay 14'b01101000000000; // LUI
+      6'b000010: controls <= #`mydelay 14'b00000000100000; // J
+		6'b000101: controls <= #`mydelay 14'b10000100000110; // BNE   added
+		6'b000011: controls <= #`mydelay 14'b00100000100001; // JAL   added
+      default:   controls <= #`mydelay 14'b00000000000000; // ???
+    endcase
+
+endmodule
+
+module aludec(input      [5:0] funct,
+              input      [2:0] aluop,
+              output reg [3:0] alucontrol,
+				  output reg jr_no_regwrite);
+
+  always @(*) begin
+    case(aluop)
+      3'b000: alucontrol <= #`mydelay 4'b0010;  // add
+      3'b001: alucontrol <= #`mydelay 4'b0110;  // sub
+      3'b010: alucontrol <= #`mydelay 4'b0001;  // or
+		3'b110: alucontrol <= #`mydelay 4'b0111;  // SLTI
+		3'b111: alucontrol <= #`mydelay 4'b1111;  // SLTIU
+      default: case(funct)          // RTYPE
+		    6'b001000: alucontrol <= #`mydelay 4'b1010; // JR  need addition with rs and $zero
+          6'b100000,
+          6'b100001: alucontrol <= #`mydelay 4'b0010; // ADD, ADDU: only difference is exception
+          6'b100010,
+          6'b100011: alucontrol <= #`mydelay 4'b0110; // SUB, SUBU: only difference is exception
+          6'b100100: alucontrol <= #`mydelay 4'b0000; // AND
+          6'b100101: alucontrol <= #`mydelay 4'b0001; // OR
+          6'b101010: alucontrol <= #`mydelay 4'b0111; // SLT
+			 6'b101011: alucontrol <= #`mydelay 4'b1111; // SLTU
+          default:   alucontrol <= #`mydelay 4'b0000;
+        endcase
+    endcase	 
+	 if (aluop == 3'b011 && funct == 6'b001000) begin
+	     jr_no_regwrite <= #`mydelay 1'b0;
+	 end
+	 else begin
+	     jr_no_regwrite <= #`mydelay 1'b1;
+	 end
+  end    
+endmodule
+
+module IF_STAGE(input			clk, reset,
+					input			  keep_write,
+					input	 [31:0] pc_next,
+					output [31:0] pc,
+					output [31:0] pc_plus4);
+					
+	flopenr #(32) pcreg(
+		.clk	 (clk),
+		.reset (reset),
+		.en	 (keep_write),
+		.d		 (pc_next),
+		.q		 (pc));
+		
+	adder pcadd_4(
+		.a (pc),
+		.b (32'b100),
+		.y (pc_plus4));
+
+endmodule
 
 module IF_ID(input 	         clk, reset,
 				   input             keep_write,
@@ -205,6 +304,90 @@ module IF_ID(input 	         clk, reset,
 	end
 endmodule
 
+module ID_STAGE(input			clk,
+					input	[31:0]  instr,
+					input   [4:0]   writereg,
+					input   [31:0]  result,
+					input   [31:0]  pc_plus4,
+					input         regwrite_wb,
+					output [31:0] reg_read_1,
+					output [31:0] reg_read_2,
+					output [31:0] signimm,
+					output [4:0]  rs,
+					output [4:0]  rd,
+					output [4:0]  rt,
+					output		  shiftl16,
+					output		  regdst,   
+					output		  alusrc,
+					output        branch,
+					output        branch_bne,
+					output        jump,
+					output        memwrite,
+					output        isjal,
+					output        memtoreg,
+					output        regwrite,
+					output [3:0]  alucontrol
+					);
+    wire 		 signext;
+	 wire        regwrite_tmp;
+	 wire        jr_no_regwrite;
+	 wire [31:0] reg_read_1_tmp, reg_read_2_tmp;
+	 wire [2:0]	 aluop;
+	 
+	 assign rs = instr[25:21];
+	 assign rt = instr[20:16];
+	 assign rd = instr[15:11];
+	 
+    regfile rf(
+		.clk     (clk),
+		.we      (regwrite_wb),
+		.ra1     (rs),
+		.ra2     (rt),
+		.wa      (writereg),
+		.wd      (result),
+		.rd1     (reg_read_1_tmp),
+		.rd2     (reg_read_2_tmp));
+
+	forwarding_in_ID fwd_ID(
+		.writereg      (writereg),
+		.reg_read_1    (rs),
+		.reg_read_2    (rt),
+		.to_be_writed  (result),
+		.rd1           (reg_read_1_tmp),
+		.rd2           (reg_read_2_tmp),
+		.forwarded_rd1 (reg_read_1),
+		.forwarded_rd2 (reg_read_2));
+		
+    sign_zero_ext sze(
+		.a       (instr[15:0]),
+		.signext (signext),
+		.y       (signimm[31:0]));
+		
+    maindec md(
+		.op       (instr[31:26]),
+		.signext  (signext),
+		.shiftl16 (shiftl16),
+		.memtoreg (memtoreg),
+		.memwrite (memwrite),
+		.branch   (branch),
+		.branch_bne  (branch_bne),
+		.alusrc   (alusrc),
+		.regdst   (regdst),
+		.regwrite (regwrite_tmp),
+		.jump     (jump),
+		.isjal    (isjal),
+		.aluop    (aluop));
+		
+	aludec ad(
+		.funct       (instr[5:0]),
+		.aluop       (aluop), 
+		.alucontrol  (alucontrol),
+		.jr_no_regwrite (jr_no_regwrite));
+		
+		assign regwrite = jr_no_regwrite & regwrite_tmp;
+
+endmodule
+
 module ID_EX(input 	         clk, reset,
 				   input      [31:0] pc_plus4_in,
 				   input      [31:0] rd1_in,
@@ -219,7 +402,7 @@ module ID_EX(input 	         clk, reset,
 				   input      [3:0]  alucontrol_in,   
 				   input             alusrc_in,    
 					input					branch_in,	
-					input					branchN_in,	
+					input					branch_bne_in,	
 					input					jump_in,	
 				   input             memwrite_in,  
 				   input             isjal_in,
@@ -238,7 +421,7 @@ module ID_EX(input 	         clk, reset,
 				   output reg [3:0]  alucontrol,   
 				   output reg        alusrc,   
 					output reg			branch,	
-					output reg			branchN,	
+					output reg			branch_bne,	
 					output reg			jump,	
 				   output reg        memwrite,  
 				   output reg        isjal,
@@ -261,7 +444,7 @@ module ID_EX(input 	         clk, reset,
 			alucontrol<= #`mydelay 1'b0;
 			alusrc    <= #`mydelay 1'b0;
 			branch    <= #`mydelay 1'b0;
-			branchN   <= #`mydelay 1'b0;
+			branch_bne   <= #`mydelay 1'b0;
 			jump      <= #`mydelay 1'b0;
 			memwrite  <= #`mydelay 1'b0; 
 			isjal  <= #`mydelay 1'b0;
@@ -282,7 +465,7 @@ module ID_EX(input 	         clk, reset,
 			alucontrol<= #`mydelay alucontrol_in;   
 			alusrc    <= #`mydelay alusrc_in;    
 			branch    <= #`mydelay branch_in;
-			branchN   <= #`mydelay branchN_in;
+			branch_bne   <= #`mydelay branch_bne_in;
 			jump      <= #`mydelay jump_in;
 			memwrite  <= #`mydelay memwrite_in;  
 			isjal  <= #`mydelay isjal_in;
@@ -290,6 +473,119 @@ module ID_EX(input 	         clk, reset,
 			memtoreg  <= #`mydelay memtoreg_in;
 		end
 	end
+endmodule
+
+module EX_STAGE(input	[31:0]  instr,
+					input [31:0]  reg_read_1,
+					input [31:0]  reg_read_2,
+					input [31:0]  foward_mem,
+					input [31:0]  foward_wd,
+					input [1:0]	  foward_rs,
+					input [1:0]	  foward_rt,
+					input [31:0]  signimm,
+					input [31:0]  pc_plus4,
+					input [31:0]  compare_pc_plus4,
+					input [4:0]   rt,
+					input [4:0]   rd,
+					input			  shiftl16,
+					input			  regdst,
+					input [3:0]   alucontrol,
+					input         alusrc,
+					input         branch,
+					input         branch_bne,
+					input         jump,
+					input         isjal,
+					output        aluzero,
+					output [31:0] aluout,
+					output [31:0] pc_next,
+					output [4:0]  writereg,
+					output [31:0] write_data
+					);
+					
+	  wire [31:0] signimmsh2, signimmsh16;
+	  wire [31:0] pc_branch;
+	  wire [31:0] pc_next_jr, pc_next_tmp;
+	  wire [31:0] alu_a, alu_b, alu_b_temp;
+	  wire [4:0]  writereg_tmp;
+	  wire        pcsrc;
+	  
+	  assign write_data = alu_b_temp;
+	  
+	  shift_left_16 sl16(
+		.a         (signimm[31:0]),
+		.shiftl16  (shiftl16),
+		.y         (signimmsh16[31:0]));
+		
+	  mux4 #(32) foward_for_rs(
+		.d0 (reg_read_1),
+		.d1 (foward_mem),
+		.d2 (foward_wd),
+		.d3 (32'b0),
+		.s	 (foward_rs),
+		.y  (alu_a));
+		
+	  mux4 #(32) foward_for_rt(
+		.d0 (reg_read_2),
+		.d1 (foward_mem),
+		.d2 (foward_wd),
+		.d3 (32'b0),
+		.s	 (foward_rt),
+		.y  (alu_b_temp));
+		
+	  mux2 #(32) alu_b_mux(
+		.d0 (alu_b_temp),
+		.d1 (signimmsh16[31:0]),
+		.s  (alusrc),
+		.y  (alu_b));
+		
+	  alu alu(
+		.a       (alu_a),
+		.b       (alu_b),
+		.alucont (alucontrol),
+		.result  (aluout),
+		.zero    (aluzero));
+		
+	  mux2 #(5) decide_dst_reg(
+		.d0  (rt),
+		.d1  (rd),
+		.s   (regdst),
+		.y   (writereg_tmp));
+		
+	assign pcsrc = branch_bne ? (branch & !aluzero) : (branch & aluzero);
+	
+	sl2 immshift(
+		.a (signimm),
+		.y (signimmsh2));
+		
+	adder pc_add_branch(
+		.a (pc_plus4),
+		.b (signimmsh2),
+		.y (pc_branch));
+	 
+	mux2 #(32) pcbrmux(
+		.d0  (compare_pc_plus4),
+		.d1  (pc_branch),
+		.s   (pcsrc),
+		.y   (pc_next_tmp));
+		
+	jrmux jrmux(
+		.d0       (pc_next_tmp),
+		.d1       (alu_a),
+		.alucontrol (alucontrol),
+		.y       (pc_next_jr));
+		
+    mux2 #(32) pcmux(
+		.d0   (pc_next_jr),
+		.d1   ({pc_plus4[31:28], instr[25:0], 2'b00}),
+		.s    (jump),
+		.y    (pc_next));
+		
+	mux2 #(5) is_jal_regwrite_mux(
+		.d0  (writereg_tmp),
+		.d1  (5'b11111),
+		.s   (isjal),
+		.y   (writereg));
+	  
 endmodule
 
 module EX_MEM(input 	         clk, reset,
@@ -303,7 +599,6 @@ module EX_MEM(input 	         clk, reset,
 				   input             regwrite_in, 
 				   input             memtoreg_in, 
 				   output reg [31:0] pc_plus4,
-				   output reg        aluzero,
 				   output reg [31:0] aluout,
 				   output reg [31:0] write_data,
 				   output reg [4:0]  writereg,
@@ -315,24 +610,22 @@ module EX_MEM(input 	         clk, reset,
 				   
 	always @(posedge clk) begin
 		if (reset) begin
-			pc_plus4      <= #`mydelay 1'b0;
-			aluzero      <= #`mydelay 1'b0;
+			pc_plus4     <= #`mydelay 1'b0;
 			aluout       <= #`mydelay 1'b0;
-			write_data          <= #`mydelay 1'b0;
+			write_data   <= #`mydelay 1'b0;
 			writereg     <= #`mydelay 1'b0;
 			memwrite     <= #`mydelay 1'b0;
-			isjal  <= #`mydelay 1'b0;
+			isjal        <= #`mydelay 1'b0;
 			regwrite     <= #`mydelay 1'b0;
 			memtoreg     <= #`mydelay 1'b0;
 		end
 		else begin
-			pc_plus4      <= #`mydelay pc_plus4_in;
-			aluzero      <= #`mydelay aluzero_in;
+			pc_plus4     <= #`mydelay pc_plus4_in;
 			aluout       <= #`mydelay aluout_in;
-			write_data          <= #`mydelay write_data_in;
+			write_data   <= #`mydelay write_data_in;
 			writereg     <= #`mydelay writereg_in;
 			memwrite     <= #`mydelay memwrite_in;
-			isjal     <= #`mydelay isjal_in;
+			isjal        <= #`mydelay isjal_in;
 			regwrite     <= #`mydelay regwrite_in;
 			memtoreg     <= #`mydelay memtoreg_in;
 		end
@@ -378,31 +671,42 @@ module MEM_WB(input 	         clk, reset,
 	end
 endmodule
 
-module is_equal(input  [31:0] d0, d1,
-              output  reg eq);
-
-  always @(*)
-	begin
-	   if (d0 == d1)  eq <= 1'b1;
-	   else          eq <= 1'b0;
-	end
-
+module WB_STAGE(input  [31:0] pc_plus4,
+					input  [31:0] aluout,
+					input  [31:0] readdata,
+					input         isjal,
+					input         memtoreg,
+					output [31:0] result);
+					
+    wire [31:0] result_tmp;
+	 
+	 mux2 #(32) resmux(
+		.d0 (aluout),
+		.d1 (readdata),
+		.s  (memtoreg),
+		.y  (result_tmp));
+		
+    mux2 #(32) jalresmux(
+		.d0 (result_tmp),
+		.d1 (pc_plus4),
+		.s  (isjal),
+		.y  (result));
 endmodule
 
 module control_hazard_unit (input [3:0] alucontrol,
 					  input 		 branch,
-					  input 		 branchN,
+					  input 		 branch_bne,
 					  input 		 jump,
 					  input 		 aluzero,
-					  output reg flush);
+					  output reg nullify);
   
   always @(*)
 	begin
-		if (aluzero == 1 && branch == 1 && branchN == 0) flush <= 1'b1;
-		else if (aluzero == 0 && branch == 1 && branchN == 1) flush <= 1'b1;
-		else if (alucontrol == 4'b1010) flush <= 1'b1;
-		else if (jump == 1) flush <= 1'b1;
-		else flush <= 1'b0;
+		if (aluzero == 1 && branch == 1 && branch_bne == 0) nullify <= 1'b1;
+		else if (aluzero == 0 && branch == 1 && branch_bne == 1) nullify <= 1'b1;
+		else if (alucontrol == 4'b1010) nullify <= 1'b1;
+		else if (jump == 1) nullify <= 1'b1;
+		else nullify <= 1'b0;
 	end
 	
 endmodule
@@ -426,8 +730,6 @@ module forwarding_unit(input regwrite_wb, regwrite_mem,
 	
 endmodule
 
-
-//mux for fowarding (foward mux)
 module mux4 #(parameter WIDTH = 8)
              (input  [WIDTH-1:0] d0, d1, d2, d3, 
               input  [1:0]       s, 
@@ -443,8 +745,6 @@ module mux4 #(parameter WIDTH = 8)
 
 endmodule
 
-
-//for data hazard
 module hazard_detect_unit(input [5:0]	op_ex,
 							input [4:0]	load_reg,
 							input [4:0]	rs_id,
@@ -457,16 +757,14 @@ module hazard_detect_unit(input [5:0]	op_ex,
 	
 endmodule
 
+module forwarding_in_ID(input [4:0] writereg, 
+							  input [4:0] reg_read_1, reg_read_2,
+							  input [31:0] to_be_writed,
+							  input [31:0] rd1, rd2,
+							  output [31:0] forwarded_rd1, forwarded_rd2);
+	assign forwarded_rd1 = (writereg == reg_read_1) ? to_be_writed : rd1;
+	assign forwarded_rd2 = (writereg == reg_read_2) ? to_be_writed : rd2;
 
-//for when read same reg that writing
-module rf_readwrite_time(input [4:0]	writereg,
-								 input [4:0]	readreg,
-								 input [31:0]	result,
-								 input [31:0]	read,
-								 output[31:0]	realread);
-								 
-	assign #`mydelay realread = (writereg == readreg) ? result : read; 
-	
 endmodule
 
 module alu(input      [31:0] a, b, 
@@ -572,8 +870,6 @@ module sl2(input  [31:0] a,
 
   assign #`mydelay y = {a[29:0], 2'b00};
 endmodule
-
-
 
 module sign_zero_ext(input      [15:0] a,
                      input             signext,
