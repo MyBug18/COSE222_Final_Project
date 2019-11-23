@@ -220,12 +220,14 @@ module maindec(input  [5:0] op,
       6'b001000, 
       6'b001001: controls <= #`mydelay 14'b10101000000000; // ADDI, ADDIU: only difference is exception
       6'b001101: controls <= #`mydelay 14'b00101000001000; // ORI
-		6'b001010: controls <= #`mydelay 14'b10101000011000; // SLTI
-		6'b001011: controls <= #`mydelay 14'b10101000011100; // SLTIU
+	  6'b001010: controls <= #`mydelay 14'b10101000011000; // SLTI
+	  6'b001011: controls <= #`mydelay 14'b10101000011100; // SLTIU
       6'b001111: controls <= #`mydelay 14'b01101000000000; // LUI
       6'b000010: controls <= #`mydelay 14'b00000000100000; // J
-		6'b000101: controls <= #`mydelay 14'b10000100000110; // BNE   added
-		6'b000011: controls <= #`mydelay 14'b00100000100001; // JAL   added
+// ###### Minsoo Kim : Start ######
+	  6'b000101: controls <= #`mydelay 14'b10000100000110; // BNE
+	  6'b000011: controls <= #`mydelay 14'b00100000100001; // JAL
+// ###### Minsoo Kim : End ######
       default:   controls <= #`mydelay 14'b00000000000000; // ???
     endcase
 
@@ -256,13 +258,33 @@ module aludec(input      [5:0] funct,
           default:   alucontrol <= #`mydelay 4'b0000;
         endcase
     endcase	 
+
+// ###### Minsoo Kim : Start ######
+
 	 if (aluop == 3'b011 && funct == 6'b001000) begin
 	     jr_no_regwrite <= #`mydelay 1'b0;
 	 end
 	 else begin
 	     jr_no_regwrite <= #`mydelay 1'b1;
 	 end
+
+// ###### Minsoo Kim : End ######
   end    
+endmodule
+
+module mux4 #(parameter WIDTH = 8)
+             (input  [WIDTH-1:0] d0, d1, d2, d3, 
+              input  [1:0]       s, 
+              output reg [WIDTH-1:0] y);
+
+  always@(s, d0, d1, d2, d3)
+    case(s)
+      2'b00: y = d0;
+      2'b01: y = d1;
+      2'b10: y = d2;
+      2'b11: y = d3;
+    endcase
+
 endmodule
 
 module alu(input      [31:0] a, b, 
@@ -299,21 +321,6 @@ module alu(input      [31:0] a, b,
     endcase
 
   assign #`mydelay zero = (result == 32'b0);
-
-endmodule
-
-module mux4 #(parameter WIDTH = 8)
-             (input  [WIDTH-1:0] d0, d1, d2, d3, 
-              input  [1:0]       s, 
-              output reg [WIDTH-1:0] y);
-
-  always@(s, d0, d1, d2, d3)
-    case(s)
-      2'b00: y = d0;
-      2'b01: y = d1;
-      2'b10: y = d2;
-      2'b11: y = d3;
-    endcase
 
 endmodule
 
@@ -440,6 +447,8 @@ module mux2 #(parameter WIDTH = 8)
 
 endmodule
 
+// ###### Minsoo Kim : Start ######
+
 module jrmux (input  [31:0] d0, d1, 
               input  [3:0]  alucontrol, 
               output [31:0] y);
@@ -447,8 +456,6 @@ module jrmux (input  [31:0] d0, d1,
   assign #`mydelay y = (alucontrol[3:0] == 4'b1010) ? d1 : d0; 
 
 endmodule
-
-// ###### Minsoo Kim: Start ######
 
 module IF_STAGE(input			clk, reset,
 					input			  keep_write,
@@ -563,14 +570,14 @@ module ID_STAGE(input			clk,
 endmodule
 
 module ID_EX(input 	         clk, reset,
-				   input      [31:0] pc_plus4_in,
-				   input      [31:0] rd1_in,
-				   input      [31:0] rd2_in,
-				   input      [31:0] immex_in,
 				   input      [31:0] instr_in,
+				   input      [31:0] pc_plus4_in,
 					input 	  [4:0]	rs_in,
 					input 	  [4:0]	rt_in,
 					input 	  [4:0]	rd_in,
+				   input      [31:0] rd1_in,
+				   input      [31:0] rd2_in,
+				   input      [31:0] immex_in,
 				   input             shiftl16_in,
 				   input             regdst_in,  
 				   input      [3:0]  alucontrol_in,   
@@ -583,13 +590,13 @@ module ID_EX(input 	         clk, reset,
 				   input             regwrite_in,
 				   input             memtoreg_in,
 				   output reg [31:0] pc_plus4,
+				   output reg [31:0] instr,
 				   output reg [31:0] rd1,
 				   output reg [31:0] rd2,
+					output reg [4:0] rs,
+					output reg [4:0] rt,
+					output reg [4:0] rd,
 				   output reg [31:0] immex,
-				   output reg [31:0] instr,
-					output reg [4:0]	rs,
-					output reg [4:0]	rt,
-					output reg [4:0]	rd,
 				   output reg        shiftl16,
 				   output reg        regdst,  
 				   output reg [3:0]  alucontrol,   
@@ -654,15 +661,15 @@ module EX_STAGE(input	[31:0]  instr,
 					input [31:0]  rd2,
 					input [31:0]  foward_mem,
 					input [31:0]  foward_wd,
-					input [1:0]	  foward_rs,
-					input [1:0]	  foward_rt,
+					input [1:0]	  foward_rs_control,
+					input [1:0]	  foward_rt_control,
 					input [31:0]  signimm,
 					input [31:0]  pc_plus4,
 					input [31:0]  compare_pc_plus4,
 					input [4:0]   rt,
 					input [4:0]   rd,
-					input			  shiftl16,
-					input			  regdst,
+					input		  shiftl16,
+					input		  regdst,
 					input [3:0]   alucontrol,
 					input         alusrc,
 					input         branch,
@@ -695,7 +702,7 @@ module EX_STAGE(input	[31:0]  instr,
 		.d1 (foward_mem),
 		.d2 (foward_wd),
 		.d3 (32'b0),
-		.s	 (foward_rs),
+		.s	 (foward_rs_control),
 		.y  (alu_a));
 		
 	  mux4 #(32) foward_for_rt(
@@ -703,7 +710,7 @@ module EX_STAGE(input	[31:0]  instr,
 		.d1 (foward_mem),
 		.d2 (foward_wd),
 		.d3 (32'b0),
-		.s	 (foward_rt),
+		.s	 (foward_rt_control),
 		.y  (alu_b_temp));
 		
 	  mux2 #(32) alu_b_mux(
@@ -888,18 +895,18 @@ endmodule
 module forwarding_unit(input regwrite_wb, regwrite_mem,
 						input [4:0] rs, rt,
 						input [4:0] writereg_mem, writereg_wb,
-						output reg[1:0] foward_rs, foward_rt);
+						output reg[1:0] foward_rs_control, foward_rt_control);
 						
   always @(regwrite_mem, regwrite_wb, writereg_mem, writereg_wb, rt, rs)
    begin
-    if       (regwrite_mem && (writereg_mem != 0) && (writereg_mem == rs)) foward_rs = 2'b01;
-	 else if  (regwrite_wb && (writereg_wb != 0) && (writereg_wb == rs)) foward_rs = 2'b10;
+    if       (regwrite_mem && (writereg_mem != 0) && (writereg_mem == rs)) foward_rs_control = 2'b01;
+	 else if  (regwrite_wb && (writereg_wb != 0) && (writereg_wb == rs)) foward_rs_control = 2'b10;
 	 else 
-		foward_rs = 2'b00;
-	 if       (regwrite_mem && (writereg_mem != 0) && (writereg_mem == rt)) foward_rt = 2'b01;
-	 else if  (regwrite_wb && (writereg_wb != 0) && (writereg_wb == rt)) foward_rt = 2'b10;
+		foward_rs_control = 2'b00;
+	 if       (regwrite_mem && (writereg_mem != 0) && (writereg_mem == rt)) foward_rt_control = 2'b01;
+	 else if  (regwrite_wb && (writereg_wb != 0) && (writereg_wb == rt)) foward_rt_control = 2'b10;
 	 else 
-		foward_rt = 2'b00;
+		foward_rt_control = 2'b00;
    end
 	
 endmodule
@@ -916,4 +923,4 @@ module hazard_detect_unit(input [5:0]	op_ex,
 	
 endmodule
 
-// ###### Minsoo Kim: End ######
+// ###### Minsoo Kim : End ######

@@ -15,12 +15,10 @@ module mips(input         clk, reset,
             output [31:0] memaddr,
             output [31:0] memwritedata,
             input  [31:0] memreaddata);
-  
-// ###### Minsoo Kim: Start ######
 
   wire [3:0]  alucontrol_id, alucontrol_ex;
   
-
+// ###### Minsoo Kim: Start ######
    wire [31:0] pc_plus4_if, pc_plus4_id, pc_plus4_ex, pc_plus4_mem, pc_plus4_wb;
    wire [31:0] instr_if, instr_id, instr_ex;
    wire [4:0] rt_id, rt_ex;
@@ -36,9 +34,9 @@ module mips(input         clk, reset,
    wire [31:0] memread_mem, memread_wb;
    wire [31:0] result_wb;
    wire aluzero_ex;
-   wire nullify_pc_move, nullify_pipe;
+   wire nullify_pc_move, nullify_ifid;
 	
-   wire [1:0] foward_rs, foward_rt;
+   wire [1:0] foward_rs_control, foward_rt_control;
   
    wire shiftl16_id, shiftl16_ex;
    wire regdst_id,regdst_ex;     
@@ -58,11 +56,11 @@ module mips(input         clk, reset,
    assign memaddr = aluout_mem;
    assign memwritedata = write_data_mem;
 	
-//	wire nullify_idex_or_reset;
+	wire nullify_idex;
 	wire keep_write;
-//	assign nullify_idex_or_reset = nullify_pc_move | reset;
+	assign nullify_idex = nullify_pc_move | reset | !keep_write;
 	
-	assign nullify_pipe = nullify_pc_move | reset;
+	assign nullify_ifid = nullify_pc_move | reset;
   
 	IF_STAGE if_stage(
 		.clk        (clk),
@@ -74,7 +72,7 @@ module mips(input         clk, reset,
 		
 	IF_ID if_id(
 		.clk       (clk),
-		.reset     (nullify_pipe),
+		.reset     (nullify_ifid),
 		.keep_write    (keep_write),
 		.pc_plus4_in (pc_plus4_if),
 		.instr_in   (instr_if),
@@ -118,43 +116,43 @@ module mips(input         clk, reset,
 		
    ID_EX id_ex(
 		.clk          (clk),
-		.reset        (nullify_pipe),
-		.pc_plus4_in    (pc_plus4_id),
-		.rd1_in        (rd1_id),
-		.rd2_in        (rd2_id),
-		.immex_in      (signimm_id),
+		.reset        (nullify_idex),
 		.instr_in      (instr_id),
+		.pc_plus4_in    (pc_plus4_id),
 		.rs_in			  (rs_id),
 		.rt_in			  (rt_id),
 		.rd_in			  (rd_id),
+		.rd1_in        (rd1_id),
+		.rd2_in        (rd2_id),
+		.immex_in      (signimm_id),
 		.shiftl16_in   (shiftl16_id),
 		.regdst_in     (regdst_id),  
-		.alucontrol_in      (alucontrol_id),   
+		.alucontrol_in (alucontrol_id),   
 		.alusrc_in     (alusrc_id),  
-		.branch_in		  (branch_id),
-		.branch_bne_in		  (branch_bne_id),
-		.jump_in			  (jump_id),
+		.branch_in	   (branch_id),
+		.branch_bne_in (branch_bne_id),
+		.jump_in	   (jump_id),
 		.memwrite_in   (memwrite_id),
 		.isjal_in   (isjal_id), 
 		.memtoreg_in   (memtoreg_id), 
 		.regwrite_in   (regwrite_id), 
 		.pc_plus4      (pc_plus4_ex),
+		.instr        (instr_ex),
 		.rd1          (rd1_ex),
 		.rd2          (rd2_ex),
-		.immex        (signimm_ex),
-		.instr        (instr_ex),
 		.rs			  (rs_ex),
 		.rt			  (rt_ex),
 		.rd			  (rd_ex),
+		.immex        (signimm_ex),
 		.shiftl16     (shiftl16_ex),
 		.regdst       (regdst_ex),  
 		.alucontrol   (alucontrol_ex),   
 		.alusrc       (alusrc_ex),  
 		.branch		  (branch_ex),
-		.branch_bne		  (branch_bne_ex),
-		.jump			  (jump_ex),
+		.branch_bne	  (branch_bne_ex),
+		.jump		  (jump_ex),
 		.memwrite     (memwrite_ex),
-		.isjal     (isjal_ex), 
+		.isjal        (isjal_ex), 
 		.regwrite     (regwrite_ex), 
 		.memtoreg     (memtoreg_ex)); 
 		
@@ -164,8 +162,8 @@ module mips(input         clk, reset,
 		.rd2     (rd2_ex),
 		.foward_mem 	(aluout_mem),
 		.foward_wd     (result_wb),
-		.foward_rs     (foward_rs),
-		.foward_rt     (foward_rt),
+		.foward_rs_control     (foward_rs_control),
+		.foward_rt_control     (foward_rt_control),
 		.signimm       (signimm_ex),
 		.pc_plus4		(pc_plus4_ex),
 		.compare_pc_plus4 (pc_plus4_if),
@@ -173,15 +171,15 @@ module mips(input         clk, reset,
 		.rd  			   (rd_ex),
 		.shiftl16      (shiftl16_ex),
 		.regdst        (regdst_ex),  
-		.alucontrol    (alucontrol_ex),   
-		.alusrc        (alusrc_ex),  
-		.branch			(branch_ex), 
-		.branch_bne			(branch_bne_ex),
-		.jump				(jump_ex),
-		.isjal      (isjal_ex), 
+		.alucontrol    (alucontrol_ex),
+		.alusrc        (alusrc_ex),
+		.branch			(branch_ex),
+		.branch_bne		(branch_bne_ex),
+		.jump			(jump_ex),
+		.isjal      	(isjal_ex), 
 		.aluzero       (aluzero_ex),
 		.aluout        (aluout_ex),
-		.pc_next			(pc_next),
+		.pc_next		(pc_next),
 		.writereg      (writereg_ex),
 		.write_data		(write_data_ex)
 		);
@@ -242,8 +240,8 @@ module mips(input         clk, reset,
 		.rt				(rt_ex),
 		.writereg_mem	(writereg_mem),
 		.writereg_wb	(writereg_wb),
-		.foward_rs		(foward_rs),
-		.foward_rt		(foward_rt));
+		.foward_rs_control		(foward_rs_control),
+		.foward_rt_control		(foward_rt_control));
 		
 	
 	hazard_detect_unit hdu(
