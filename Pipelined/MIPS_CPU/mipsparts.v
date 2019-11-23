@@ -246,7 +246,7 @@ module aludec(input      [5:0] funct,
 		3'b110: alucontrol <= #`mydelay 4'b0111;  // SLTI
 		3'b111: alucontrol <= #`mydelay 4'b1111;  // SLTIU
       default: case(funct)          // RTYPE
-		    6'b001000: alucontrol <= #`mydelay 4'b1010; // JR  need addition with rs and $zero
+		    6'b001000: alucontrol <= #`mydelay 4'b1010; // JR
           6'b100000,
           6'b100001: alucontrol <= #`mydelay 4'b0010; // ADD, ADDU: only difference is exception
           6'b100010,
@@ -259,16 +259,12 @@ module aludec(input      [5:0] funct,
         endcase
     endcase	 
 
-// ###### Minsoo Kim : Start ######
-
 	 if (aluop == 3'b011 && funct == 6'b001000) begin
 	     jr_no_regwrite <= #`mydelay 1'b0;
 	 end
 	 else begin
 	     jr_no_regwrite <= #`mydelay 1'b1;
 	 end
-
-// ###### Minsoo Kim : End ######
   end    
 endmodule
 
@@ -292,7 +288,7 @@ module alu(input      [31:0] a, b,
            output reg [31:0] result,
            output            zero);
 
-  wire [31:0] b2, sum, slt, sltu, Fslt;
+  wire [31:0] b2, sum, slt, sltu, real_slt;
   wire        N, Z, C, V;
 
   assign b2 = alucont[2] ? ~b:b; 
@@ -310,14 +306,14 @@ module alu(input      [31:0] a, b,
 
   assign sltu = ~C ;
 
-  assign Fslt = (alucont[3] == 1) ? {31'b0, sltu[0]}:{31'b0, slt[0]};
+  assign real_slt = (alucont[3] == 1) ? {31'b0, sltu[0]}:{31'b0, slt[0]};
 
   always@(*)
     case(alucont[1:0])
       2'b00: result <= #`mydelay a & b;
       2'b01: result <= #`mydelay a | b;
       2'b10: result <= #`mydelay sum;
-      2'b11: result <= #`mydelay Fslt;
+      2'b11: result <= #`mydelay real_slt;
     endcase
 
   assign #`mydelay zero = (result == 32'b0);
@@ -377,12 +373,6 @@ module adder_1bit (input a, b, cin,
   assign sum  = a ^ b ^ cin;
   assign cout = (a & b) | (a & cin) | (b & cin);
 
-endmodule
-
-module adder(input [31:0] a, b,
-             output [31:0] y);
-
-  assign #`mydelay y = a + b;
 endmodule
 
 module sl2(input  [31:0] a,
@@ -469,11 +459,8 @@ module IF_STAGE(input			clk, reset,
 		.en	 (keep_write),
 		.d		 (pc_next),
 		.q		 (pc));
-		
-	adder pcadd_4(
-		.a (pc),
-		.b (32'b100),
-		.y (pc_plus4));
+
+	assign #`mydelay pc_plus4 = pc + 32'b100;
 
 endmodule
 
@@ -497,10 +484,10 @@ module IF_ID(input 	         clk, reset,
 endmodule
 
 module ID_STAGE(input			clk,
-					input	[31:0]  instr,
-					input   [4:0]   writereg,
-					input   [31:0]  result,
-					input   [31:0]  pc_plus4,
+					input  [31:0] instr,
+					input  [4:0]  writereg,
+					input  [31:0] result,
+					input  [31:0] pc_plus4,
 					input         regwrite_wb,
 					output [31:0] rd1,
 					output [31:0] rd2,
@@ -565,9 +552,6 @@ endmodule
 module ID_EX(input 	         clk, reset,
 				   input      [31:0] instr_in,
 				   input      [31:0] pc_plus4_in,
-					input 	  [4:0]	rs_in,
-					input 	  [4:0]	rt_in,
-					input 	  [4:0]	rd_in,
 				   input      [31:0] rd1_in,
 				   input      [31:0] rd2_in,
 				   input      [31:0] immex_in,
@@ -575,9 +559,9 @@ module ID_EX(input 	         clk, reset,
 				   input             regdst_in,  
 				   input      [3:0]  alucontrol_in,   
 				   input             alusrc_in,    
-					input			branch_in,	
-					input			branch_bne_in,	
-					input			jump_in,	
+				   input			 branch_in,	
+				   input			 branch_bne_in,	
+				   input			 jump_in,	
 				   input             memwrite_in,  
 				   input             isjal_in,
 				   input             regwrite_in,
@@ -586,17 +570,14 @@ module ID_EX(input 	         clk, reset,
 				   output reg [31:0] instr,
 				   output reg [31:0] rd1,
 				   output reg [31:0] rd2,
-					output reg [4:0] rs,
-					output reg [4:0] rt,
-					output reg [4:0] rd,
 				   output reg [31:0] immex,
 				   output reg        shiftl16,
 				   output reg        regdst,  
 				   output reg [3:0]  alucontrol,   
 				   output reg        alusrc,   
-					output reg			branch,	
-					output reg			branch_bne,	
-					output reg			jump,	
+				   output reg		 branch,	
+				   output reg		 branch_bne,	
+				   output reg		 jump,	
 				   output reg        memwrite,  
 				   output reg        isjal,
 				   output reg        regwrite,
@@ -610,9 +591,6 @@ module ID_EX(input 	         clk, reset,
 			rd2       <= #`mydelay 1'b0;
 			immex     <= #`mydelay 1'b0;
 			instr     <= #`mydelay 1'b0;
-			rs        <= #`mydelay 1'b0;
-			rt        <= #`mydelay 1'b0;
-			rd        <= #`mydelay 1'b0;
 			shiftl16  <= #`mydelay 1'b0;
 			regdst    <= #`mydelay 1'b0;
 			alucontrol<= #`mydelay 1'b0;
@@ -631,9 +609,6 @@ module ID_EX(input 	         clk, reset,
 			rd2       <= #`mydelay rd2_in;
 			immex     <= #`mydelay immex_in;
 			instr     <= #`mydelay instr_in;
-			rs        <= #`mydelay rs_in;
-			rt        <= #`mydelay rt_in;
-			rd        <= #`mydelay rd_in;
 			shiftl16  <= #`mydelay shiftl16_in;
 			regdst    <= #`mydelay regdst_in;  
 			alucontrol<= #`mydelay alucontrol_in;   
@@ -659,8 +634,6 @@ module EX_STAGE(input	[31:0]  instr,
 					input [31:0]  signimm,
 					input [31:0]  pc_plus4,
 					input [31:0]  compare_pc_plus4,
-					input [4:0]   rt,
-					input [4:0]   rd,
 					input		  shiftl16,
 					input		  regdst,
 					input [3:0]   alucontrol,
@@ -720,8 +693,8 @@ module EX_STAGE(input	[31:0]  instr,
 		.zero    (aluzero));
 		
 	  mux2 #(5) decide_dst_reg(
-		.d0  (rt),
-		.d1  (rd),
+		.d0  (instr[20:16]),
+		.d1  (instr[15:11]),
 		.s   (regdst),
 		.y   (writereg_tmp));
 		
@@ -730,11 +703,8 @@ module EX_STAGE(input	[31:0]  instr,
 	sl2 immshift(
 		.a (signimm),
 		.y (signimmsh2));
-		
-	adder pc_add_branch(
-		.a (pc_plus4),
-		.b (signimmsh2),
-		.y (pc_branch));
+
+	assign #`mydelay pc_branch = signimmsh2 + pc_plus4; 
 	 
 	mux2 #(32) pcbrmux(
 		.d0  (compare_pc_plus4),
