@@ -505,9 +505,6 @@ module ID_STAGE(input			clk,
 					output [31:0] rd1,
 					output [31:0] rd2,
 					output [31:0] signimm,
-					output [4:0]  rs,
-					output [4:0]  rd,
-					output [4:0]  rt,
 					output		  shiftl16,
 					output		  regdst,   
 					output		  alusrc,
@@ -521,19 +518,15 @@ module ID_STAGE(input			clk,
 					output [3:0]  alucontrol
 					);
     wire 		 signext;
-	 wire        regwrite_tmp;
-	 wire        jr_no_regwrite;
-	 wire [2:0]	 aluop;
-	 
-	 assign rs = instr[25:21];
-	 assign rt = instr[20:16];
-	 assign rd = instr[15:11];
+	wire        regwrite_tmp;
+	wire        jr_no_regwrite;
+	wire [2:0]	 aluop;
 	 
     regfile rf(
 		.clk     (clk),
 		.we      (regwrite_wb),
-		.ra1     (rs),
-		.ra2     (rt),
+		.ra1     (instr[25:21]),
+		.ra2     (instr[20:16]),
 		.wa      (writereg),
 		.wd      (result),
 		.rd1     (rd1),

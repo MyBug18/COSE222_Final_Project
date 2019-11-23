@@ -21,9 +21,7 @@ module mips(input         clk, reset,
 // ###### Minsoo Kim: Start ######
    wire [31:0] pc_plus4_if, pc_plus4_id, pc_plus4_ex, pc_plus4_mem, pc_plus4_wb;
    wire [31:0] instr_if, instr_id, instr_ex;
-   wire [4:0] rt_id, rt_ex;
-   wire [4:0] rd_id, rd_ex;
-   wire [4:0] rs_id, rs_ex;
+   wire [4:0] rt_ex, rd_ex, rs_ex;
    wire [4:0] writereg_ex, writereg_mem, writereg_wb;
    wire [31:0] write_data_ex, write_data_mem;
    wire [31:0] pc_next;
@@ -88,9 +86,6 @@ module mips(input         clk, reset,
 		.rd1    (rd1_id),
 		.rd2    (rd2_id),
 		.signimm      (signimm_id),
-		.rs			  (rs_id),
-		.rt			  (rt_id),
-		.rd			  (rd_id),
 		.shiftl16     (shiftl16_id),
 		.regdst       (regdst_id),  
 		.alusrc       (alusrc_id),  
@@ -119,9 +114,9 @@ module mips(input         clk, reset,
 		.reset        (nullify_idex),
 		.instr_in      (instr_id),
 		.pc_plus4_in    (pc_plus4_id),
-		.rs_in			  (rs_id),
-		.rt_in			  (rt_id),
-		.rd_in			  (rd_id),
+		.rs_in			  (instr_id[25:21]),
+		.rt_in			  (instr_id[20:16]),
+		.rd_in			  (instr_id[15:11]),
 		.rd1_in        (rd1_id),
 		.rd2_in        (rd2_id),
 		.immex_in      (signimm_id),
@@ -247,8 +242,8 @@ module mips(input         clk, reset,
 	hazard_detect_unit hdu(
 		.op_ex			(instr_ex[31:26]),
 		.load_reg		(rt_ex),
-		.rs_id			(rs_id),
-		.rt_id			(rt_id),
+		.rs_id			(instr_id[25:21]),
+		.rt_id			(instr_id[20:16]),
 		.keep_write		(keep_write));
 
 endmodule
