@@ -224,10 +224,8 @@ module maindec(input  [5:0] op,
 	  6'b001011: controls <= #`mydelay 14'b10101000011100; // SLTIU
       6'b001111: controls <= #`mydelay 14'b01101000000000; // LUI
       6'b000010: controls <= #`mydelay 14'b00000000100000; // J
-// ###### Minsoo Kim : Start ######
 	  6'b000101: controls <= #`mydelay 14'b10000100000110; // BNE
 	  6'b000011: controls <= #`mydelay 14'b00100000100001; // JAL
-// ###### Minsoo Kim : End ######
       default:   controls <= #`mydelay 14'b00000000000000; // ???
     endcase
 
