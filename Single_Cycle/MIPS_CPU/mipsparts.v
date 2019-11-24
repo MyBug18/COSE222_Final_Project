@@ -197,14 +197,14 @@ module alu(input      [31:0] a, b,
            output reg [31:0] result,
            output            zero);
 
-  wire [31:0] b2, sum, slt, sltu;
+  wire [31:0] b2, sum, slt, sltu, Fslt;
   wire        N, Z, C, V;
 
-  assign b2 = alucont[3] ? ~b:b; 
+  assign b2 = alucont[2] ? ~b:b; 
 
   adder_32bit iadder32 (.a   (a),
-			     				.b   (b2),
-								.cin (alucont[3]),
+			               .b   (b2),
+								.cin (alucont[2]),
 								.sum (sum),
 								.N   (N),
 								.Z   (Z),
@@ -215,16 +215,16 @@ module alu(input      [31:0] a, b,
   assign slt  = N ^ V ; 
 
   // unsigned lower (C clear) 
-  assign sltu = ~C ;   
+  assign sltu = ~C ;
+
+  assign Fslt = (alucont[3] == 1) ? {31'b0, sltu[0]}:{31'b0, slt[0]};   //sltu:1, slt: 0
 
   always@(*)
-    case(alucont[2:0])
-      3'b000: result <= #`mydelay a & b;
-      3'b001: result <= #`mydelay a | b;
-      3'b010: result <= #`mydelay sum;
-      3'b011: result <= #`mydelay slt;
-	  3'b100: result <= #`mydelay {31'b0,sltu[0]};
-	  default: result <= #`mydelay 32'bx;
+    case(alucont[1:0])
+      2'b00: result <= #`mydelay a & b;
+      2'b01: result <= #`mydelay a | b;
+      2'b10: result <= #`mydelay sum;
+      2'b11: result <= #`mydelay Fslt;
     endcase
 
   assign #`mydelay zero = (result == 32'b0);
@@ -366,6 +366,14 @@ module mux2 #(parameter WIDTH = 8)
               input              s, 
               output [WIDTH-1:0] y);
 
-  assign #`mydelay y = s ? d1 : d0; 
+  assign #`mydelay y = (s == 1) ? d1 : d0; 
+
+endmodule
+
+module jrmux (input  [31:0] d0, d1, 
+              input  [3:0]  alucontrol, 
+              output [31:0] y);
+
+  assign #`mydelay y = (alucontrol[3:0] == 4'b1010) ? d1 : d0; 
 
 endmodule
