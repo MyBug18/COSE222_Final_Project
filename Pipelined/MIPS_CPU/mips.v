@@ -17,18 +17,17 @@ module mips(input         clk, reset,
             input  [31:0] memreaddata);
 
   wire [3:0]  alucontrol_id, alucontrol_ex;
+   wire [1:0] aluop_id, aluop_ex;
   
 // ###### Minsoo Kim: Start ######
-   wire [31:0] pc_plus4_if, pc_plus4_id, pc_plus4_ex, pc_plus4_mem, pc_plus4_wb;
-   wire [31:0] instr_if, instr_id, instr_ex;
+   wire [31:0] pc_plus4_if, pc_plus4_id, pc_plus4_ex, pc_plus4_mem, pc_plus4_wb, pc_next;
+   wire [31:0] instr_id, instr_ex;
    wire [4:0] writereg_ex, writereg_mem, writereg_wb;
    wire [31:0] write_data_ex, write_data_mem;
-   wire [31:0] pc_next;
-   wire [31:0] rd1_id, rd1_ex;
-   wire [31:0] rd2_id, rd2_ex;
+   wire [31:0] rd1_id, rd1_ex, rd2_id, rd2_ex;
    wire [31:0] signimm_id, signimm_ex;
    wire [31:0] aluout_ex, aluout_mem, aluout_wb;
-   wire [31:0] memread_mem, memread_wb;
+   wire [31:0] memread_wb;
    wire [31:0] result_wb;
    wire aluzero_ex;
    wire nullify_pc_move, nullify_pipe;
@@ -36,27 +35,22 @@ module mips(input         clk, reset,
    wire [1:0] foward_rs_control, foward_rt_control;
   
    wire shiftl16_id, shiftl16_ex;
-   wire regdst_id,regdst_ex;     
-   wire [1:0] aluop_id, aluop_ex;
-   wire alusrc_id, alusrc_ex;    
-   wire branch_id, branch_ex;   
-   wire branch_bne_id, branch_bne_ex;  
-   wire jump_id, jump_ex;     
+   wire regdst_id,regdst_ex;
+   wire alusrc_id, alusrc_ex;
+   wire branch_id, branch_ex;
+   wire branch_bne_id, branch_bne_ex;
+   wire jump_id, jump_ex;
    wire memwrite_id, memwrite_ex, memwrite_mem;
-   wire isjal_id, isjal_ex, isjal_mem, isjal_wb;  
+   wire isjal_id, isjal_ex, isjal_mem, isjal_wb;
    wire regwrite_id, regwrite_ex, regwrite_mem, regwrite_wb;
-   wire memtoreg_id, memtoreg_ex, memtoreg_mem, memtoreg_wb;              
-  
-   assign instr_if = instr;
-   assign memread_mem = memreaddata;
+   wire memtoreg_id, memtoreg_ex, memtoreg_mem, memtoreg_wb;
+
    assign memwrite = memwrite_mem;
    assign memaddr = aluout_mem;
    assign memwritedata = write_data_mem;
 	
 	wire nullify_idex;
 	wire keep_write;	
-	assign nullify_pipe = nullify_pc_move | reset;
-	assign nullify_idex = nullify_pipe | !keep_write;
   
 	IF_STAGE if_stage(
 		.clk        (clk),
@@ -71,7 +65,7 @@ module mips(input         clk, reset,
 		.reset     (nullify_pipe),
 		.keep_write    (keep_write),
 		.pc_plus4_in (pc_plus4_if),
-		.instr_in   (instr_if),
+		.instr_in   (instr),
 		.pc_plus4   (pc_plus4_id),
 		.instr     (instr_id));
 		
@@ -98,6 +92,11 @@ module mips(input         clk, reset,
 		.regwrite_wb  (regwrite_wb)
 		);
 		
+	// ###### Minsoo Kim (for milestone 5): Start ######
+
+	assign nullify_pipe = nullify_pc_move | reset;
+	assign nullify_idex = nullify_pipe | !keep_write;
+
 	control_hazard_unit chu(
 		.alucontrol	  (alucontrol_ex),
 		.branch		  (branch_ex),
@@ -106,7 +105,9 @@ module mips(input         clk, reset,
 		.aluzero			  (aluzero_ex),
 		.nullify		  (nullify_pc_move)
 		);
-		
+				
+	// ###### Minsoo Kim (for milestone 5): End ######
+
    ID_EX id_ex(
 		.clk          (clk),
 		.reset        (nullify_idex),
@@ -195,7 +196,7 @@ module mips(input         clk, reset,
 		.clk            (clk),
 		.reset          (reset),
 		.pc_plus4_in      (pc_plus4_mem),
-		.readdata_in     (memread_mem),
+		.readdata_in     (memreaddata),
 		.aluout_in       (aluout_mem),
 		.writereg_in     (writereg_mem),
 		.isjal_in  (isjal_mem),  
@@ -217,7 +218,9 @@ module mips(input         clk, reset,
 		.isjal  (isjal_wb),
 		.memtoreg  (memtoreg_wb),
 		.result    (result_wb));
-		
+
+// ###### Minsoo Kim (for milestone 4): Start ######
+
 	forwarding_unit fu(
 		.regwrite_wb	(regwrite_wb),
 		.regwrite_mem	(regwrite_mem),
@@ -235,6 +238,8 @@ module mips(input         clk, reset,
 		.rs_id			(instr_id[25:21]),
 		.rt_id			(instr_id[20:16]),
 		.keep_write		(keep_write));
+
+// ###### Minsoo Kim (for milestone 4): End ######
 
 endmodule
 

@@ -786,7 +786,7 @@ module MEM_WB(input 	         clk, reset,
 				   output reg [31:0] readdata,
 				   output reg [31:0] aluout,
 				   output reg [4:0]  writereg,
-				   output reg        isjal, 
+				   output reg        isjal,
 				   output reg        regwrite, 
 				   output reg        memtoreg 
 				   );
@@ -842,7 +842,7 @@ module control_hazard_unit (input [3:0] alucontrol,
 					  input 		 aluzero,
 					  output reg nullify);
   
-  always @(*)
+  always @(*) 
 	begin
 		if (aluzero == 1 && branch == 1 && branch_bne == 0) nullify <= 1'b1;
 		else if (aluzero == 0 && branch == 1 && branch_bne == 1) nullify <= 1'b1;
